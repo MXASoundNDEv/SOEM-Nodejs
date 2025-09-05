@@ -2,8 +2,10 @@
 const { spawnSync } = require('node:child_process');
 
 console.log('[soem-node] Building native addon with cmake-js...');
-const res = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['cmake-js', 'rebuild'], { stdio: 'inherit' });
+const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const res = spawnSync(cmd, ['cmake-js', 'rebuild'], { stdio: 'inherit' });
 if (res.status !== 0) {
-    console.error('\n[soem-node] Build failed. Ensure you have CMake, a C/C++ toolchain, and libpcap/raw socket perms.');
-    process.exit(res.status || 1);
+  console.error('\n[soem-node] Build failed. Ensure CMake and a C/C++ toolchain are installed.');
+  console.error('You can set DEBUG=cmake-js:* for verbose logs.');
+  process.exit(res.status || 1);
 }

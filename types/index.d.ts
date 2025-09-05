@@ -1,6 +1,6 @@
 export type IfName = string;
 export class SoemMaster {
-    constructor(ifname ? : IfName);
+    constructor(ifname?: IfName);
     init(): boolean;
     configInit(): number;
     configMapPDO(): void;
