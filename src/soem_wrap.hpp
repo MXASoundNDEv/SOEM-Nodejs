@@ -30,6 +30,8 @@ namespace soemnode
         // champs
         std::string ifname_;
         bool opened_ = false;
+        /* SOEM reentrant context */
+        ecx_contextt ctx_ = {0};
     };
 
 }

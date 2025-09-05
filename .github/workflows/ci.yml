@@ -1,0 +1,42 @@
+name: CI - build native addon and smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [22]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install deps
+        run: |
+          npm ci
+
+      - name: Build native addon
+        run: |
+          npx cmake-js rebuild --loglevel=info
+
+      - name: Ensure .node filename on Windows
+        if: runner.os == 'Windows'
+        run: |
+          if (Test-Path build\\Release\\soem_addon.dll) { Copy-Item build\\Release\\soem_addon.dll build\\Release\\soem_addon.node -Force }
+        shell: pwsh
+
+      - name: Smoke test - require module
+        run: |
+          node -e "const path=require('path'); const f=path.join(__dirname,'..','build','Release','soem_addon.node'); try{ const a=require(f); console.log('exports',Object.keys(a)); const M=a.Master; console.log('Master type',typeof M); const m=new M('lo'); console.log('instantiation ok'); }catch(e){ console.error('smoke test failed', e&&e.message); process.exit(1);}"

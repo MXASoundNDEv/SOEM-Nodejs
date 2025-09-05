@@ -25,9 +25,19 @@ add_library(soem_addon MODULE src/addon.cc)
 
 # Définitions pour Linux/raw socket
 if(UNIX AND NOT APPLE)
-  target_link_libraries(soem_addon PRIVATE soem rt pthread)
+  # On Unix link with soem and system libs; node is usually dynamically available.
+  if(DEFINED CMAKE_JS_LIB)
+    target_link_libraries(soem_addon PRIVATE soem rt pthread ${CMAKE_JS_LIB})
+  else()
+    target_link_libraries(soem_addon PRIVATE soem rt pthread)
+  endif()
 else()
-  target_link_libraries(soem_addon PRIVATE soem)
+  # On Windows we must link with the node library provided by cmake-js (node.lib)
+  if(DEFINED CMAKE_JS_LIB)
+    target_link_libraries(soem_addon PRIVATE soem ${CMAKE_JS_LIB})
+  else()
+    target_link_libraries(soem_addon PRIVATE soem)
+  endif()
 endif()
 
 # Include paths

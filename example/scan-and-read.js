@@ -1,4 +1,3 @@
-examples / scan - and - read.js
 const { SoemMaster } = require('../dist');
 
 async function main() {
