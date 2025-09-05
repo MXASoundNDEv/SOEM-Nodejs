@@ -1,0 +1,31 @@
+{
+  "name": "soem-node",
+  "version": "0.1.0",
+  "description": "Bindings Node-API pour SOEM (Simple Open EtherCAT Master)",
+  "main": "dist/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "build": "tsc && cmake-js rebuild",
+    "install": "node scripts/postinstall.js",
+    "prepare": "npm run build",
+    "example": "node examples/scan-and-read.js"
+  },
+  "gypfile": false,
+  "engines": { "node": ">=18" },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "cmake-js": "^7.3.0",
+    "node-addon-api": "^8.0.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {},
+  "os": ["linux", "darwin", "win32"],
+  "cpu": ["x64", "arm64"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ton-org/soem-node.git"
+  },
+  "keywords": ["ethercat", "soem", "fieldbus", "industrial"],
+  "author": "MXA.K",
+  "license": "GPL-2.0-or-later"
+}
