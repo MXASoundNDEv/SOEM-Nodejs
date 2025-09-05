@@ -2,7 +2,7 @@
 #include <napi.h>
 extern "C"
 {
-#include "ethercat.h"
+#include "soem/soem.h"
 }
 
 namespace soemnode

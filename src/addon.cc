@@ -1,17 +1,16 @@
 #include "soem_wrap.hpp"
 #include <cstring>
 
-using namespace Napi;
 using namespace soemnode;
 
-static FunctionReference masterCtor;
+static Napi::FunctionReference masterCtor;
 
-Master::Master(const CallbackInfo &info) : ObjectWrap<Master>(info)
+Master::Master(const Napi::CallbackInfo &info) : Napi::ObjectWrap<Master>(info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     if (info.Length() > 0 && info[0].IsString())
     {
-        ifname_ = info[0].As<String>().Utf8Value();
+        ifname_ = info[0].As<Napi::String>().Utf8Value();
     }
     else
     {
@@ -19,92 +18,92 @@ Master::Master(const CallbackInfo &info) : ObjectWrap<Master>(info)
     }
 }
 
-Value Master::init(const CallbackInfo &info)
+Napi::Value Master::init(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     if (opened_)
-        return Boolean::New(env, true);
+        return Napi::Boolean::New(env, true);
     if (ec_init(ifname_.c_str()))
     {
         opened_ = true;
-        return Boolean::New(env, true);
+        return Napi::Boolean::New(env, true);
     }
-    return Boolean::New(env, false);
+    return Napi::Boolean::New(env, false);
 }
 
-Value Master::configInit(const CallbackInfo &info)
+Napi::Value Master::configInit(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     if (!opened_)
-        return Boolean::New(env, false);
+        return Napi::Boolean::New(env, false);
     int slaves = ec_config_init(FALSE);
-    return Number::New(env, slaves);
+    return Napi::Number::New(env, slaves);
 }
 
-Value Master::configMapPDO(const CallbackInfo &info)
+Napi::Value Master::configMapPDO(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     ec_config_map(&ec_slave[0].userdata);
     ec_configdc();
     return env.Undefined();
 }
 
-Value Master::state(const CallbackInfo &info)
+Napi::Value Master::state(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
-    return Number::New(env, ec_slave[0].state);
+    Napi::Env env = info.Env();
+    return Napi::Number::New(env, ec_slave[0].state);
 }
 
-Value Master::readState(const CallbackInfo &info)
+Napi::Value Master::readState(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     ec_readstate();
-    return Number::New(env, ec_slave[0].state);
+    return Napi::Number::New(env, ec_slave[0].state);
 }
 
-Value Master::sdoRead(const CallbackInfo &info)
+Napi::Value Master::sdoRead(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     if (info.Length() < 3)
         return env.Null();
-    uint16 slave = info[0].As<Number>().Uint32Value();
-    uint16 index = info[1].As<Number>().Uint32Value();
-    uint8 subidx = info[2].As<Number>().Uint32Value();
+    uint16 slave = info[0].As<Napi::Number>().Uint32Value();
+    uint16 index = info[1].As<Napi::Number>().Uint32Value();
+    uint8 subidx = info[2].As<Napi::Number>().Uint32Value();
     uint8 buf[512];
     int sz = sizeof(buf);
     int wkc = ec_SDOread(slave, index, subidx, FALSE, &sz, buf, EC_TIMEOUTRXM);
     if (wkc <= 0)
         return env.Null();
-    return Buffer<uint8_t>::Copy(env, buf, sz);
+    return Napi::Buffer<uint8_t>::Copy(env, buf, sz);
 }
 
-Value Master::sdoWrite(const CallbackInfo &info)
+Napi::Value Master::sdoWrite(const Napi::CallbackInfo &info)
 {
-    Env env = info.Env();
+    Napi::Env env = info.Env();
     if (info.Length() < 4)
-        return Boolean::New(env, false);
-    uint16 slave = info[0].As<Number>().Uint32Value();
-    uint16 index = info[1].As<Number>().Uint32Value();
-    uint8 subidx = info[2].As<Number>().Uint32Value();
-    Buffer<uint8_t> data = info[3].As<Buffer<uint8_t>>();
+        return Napi::Boolean::New(env, false);
+    uint16 slave = info[0].As<Napi::Number>().Uint32Value();
+    uint16 index = info[1].As<Napi::Number>().Uint32Value();
+    uint8 subidx = info[2].As<Napi::Number>().Uint32Value();
+    Napi::Buffer<uint8_t> data = info[3].As<Napi::Buffer<uint8_t>>();
     int sz = data.Length();
     int wkc = ec_SDOwrite(slave, index, subidx, FALSE, sz, data.Data(), EC_TIMEOUTRXM);
-    return Boolean::New(env, wkc > 0);
+    return Napi::Boolean::New(env, wkc > 0);
 }
 
-Value Master::sendProcessdata(const CallbackInfo &info)
+Napi::Value Master::sendProcessdata(const Napi::CallbackInfo &info)
 {
     int wkc = ec_send_processdata();
-    return Number::New(info.Env(), wkc);
+    return Napi::Number::New(info.Env(), wkc);
 }
 
-Value Master::receiveProcessdata(const CallbackInfo &info)
+Napi::Value Master::receiveProcessdata(const Napi::CallbackInfo &info)
 {
     int wkc = ec_receive_processdata(EC_TIMEOUTRET);
-    return Number::New(info.Env(), wkc);
+    return Napi::Number::New(info.Env(), wkc);
 }
 
-Value Master::close(const CallbackInfo &info)
+Napi::Value Master::close(const Napi::CallbackInfo &info)
 {
     if (opened_)
     {
@@ -114,15 +113,15 @@ Value Master::close(const CallbackInfo &info)
     return info.Env().Undefined();
 }
 
-Function Master::Init(Env env)
+Napi::Function Master::Init(Napi::Env env)
 {
-    Function func = DefineClass(env, "Master", {InstanceMethod("init", &Master::init), InstanceMethod("configInit", &Master::configInit), InstanceMethod("configMapPDO", &Master::configMapPDO), InstanceMethod("state", &Master::state), InstanceMethod("readState", &Master::readState), InstanceMethod("sdoRead", &Master::sdoRead), InstanceMethod("sdoWrite", &Master::sdoWrite), InstanceMethod("sendProcessdata", &Master::sendProcessdata), InstanceMethod("receiveProcessdata", &Master::receiveProcessdata), InstanceMethod("close", &Master::close)});
-    masterCtor = Persistent(func);
+    Napi::Function func = Napi::DefineClass(env, "Master", {Napi::InstanceMethod("init", &Master::init), Napi::InstanceMethod("configInit", &Master::configInit), Napi::InstanceMethod("configMapPDO", &Master::configMapPDO), Napi::InstanceMethod("state", &Master::state), Napi::InstanceMethod("readState", &Master::readState), Napi::InstanceMethod("sdoRead", &Master::sdoRead), Napi::InstanceMethod("sdoWrite", &Master::sdoWrite), Napi::InstanceMethod("sendProcessdata", &Master::sendProcessdata), Napi::InstanceMethod("receiveProcessdata", &Master::receiveProcessdata), Napi::InstanceMethod("close", &Master::close)});
+    masterCtor = Napi::Persistent(func);
     masterCtor.SuppressDestruct();
     return func;
 }
 
-Object InitAll(Env env, Object exports)
+Napi::Object InitAll(Napi::Env env, Napi::Object exports)
 {
     exports.Set("Master", Master::Init(env));
     return exports;
