@@ -89,11 +89,31 @@ jobs:
           echo "Checking submodule status..."
           git submodule status
           echo "Listing external directory..."
-          ls -la external/
+          ls -la external/ || mkdir -p external
+
           if [ ! -f "external/soem/CMakeLists.txt" ]; then
-            echo "SOEM submodule not properly initialized, initializing manually..."
-            git submodule update --init --recursive --force
+            echo "SOEM submodule not properly initialized, trying multiple methods..."
+            
+            # Method 1: Force submodule update
+            git submodule update --init --recursive --force || echo "Method 1 failed"
+            
+            # Method 2: If still not found, clone directly
+            if [ ! -f "external/soem/CMakeLists.txt" ]; then
+              echo "Direct clone fallback..."
+              rm -rf external/soem
+              git clone https://github.com/OpenEtherCATsociety/SOEM.git external/soem
+            fi
+            
+            # Verify final state
+            if [ ! -f "external/soem/CMakeLists.txt" ]; then
+              echo "ERROR: Could not initialize SOEM submodule"
+              exit 1
+            fi
+            
+            echo "SOEM successfully initialized:"
             ls -la external/soem/
+          else
+            echo "SOEM submodule already properly initialized"
           fi
 
       - name: Setup Node.js ${{ matrix.node-version }}
@@ -112,7 +132,13 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install cmake libpcap pkg-config ninja
+          # Handle potential cmake conflicts
+          if brew list cmake >/dev/null 2>&1; then
+            echo "CMake already installed, skipping..."
+          else
+            brew install cmake
+          fi
+          brew install libpcap pkg-config ninja
 
       - name: Install Node.js dependencies
         run: npm ci
