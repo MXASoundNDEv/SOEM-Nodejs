@@ -31,6 +31,18 @@ jobs:
         run: |
           npx cmake-js rebuild --loglevel=info
 
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libpcap-dev pkg-config python3 python3-pip
+
+      - name: Install system deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake libpcap pkg-config
+
       - name: Ensure .node filename on Windows
         if: runner.os == 'Windows'
         run: |
@@ -38,5 +50,15 @@ jobs:
         shell: pwsh
 
       - name: Smoke test - require module
+        # POSIX smoke test
+        if: runner.os != 'Windows'
         run: |
-          node -e "const path=require('path'); const f=path.join(__dirname,'..','build','Release','soem_addon.node'); try{ const a=require(f); console.log('exports',Object.keys(a)); const M=a.Master; console.log('Master type',typeof M); const m=new M('lo'); console.log('instantiation ok'); }catch(e){ console.error('smoke test failed', e&&e.message); process.exit(1);}"
+          ls -la build/Release || true
+          node -e "try{ const a=require('./build/Release/soem_addon.node'); console.log('exports',Object.keys(a)); const M=a.Master; console.log('Master type',typeof M); const m=new M('lo'); console.log('instantiation ok'); }catch(e){ console.error('smoke test failed', e&&e.message); process.exit(1); }"
+
+      - name: Smoke test - require module (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path build\\Release\\soem_addon.node) { Write-Output 'found build\\Release\\soem_addon.node' } else { Get-ChildItem build\\Release -Force | Write-Output }
+          node -e "try{ const a=require('./build/Release/soem_addon.node'); console.log('exports',Object.keys(a)); const M=a.Master; console.log('Master type',typeof M); const m=new M('lo'); console.log('instantiation ok'); }catch(e){ console.error('smoke test failed', e&&e.message); process.exit(1); }"

@@ -17,8 +17,19 @@ if(NOT EXISTS "${NAPI_DIR}")
   set(NAPI_DIR "${CMAKE_SOURCE_DIR}/node_modules/node-addon-api/include")
 endif()
 
-# SOEM en sous-module
-add_subdirectory(external/soem EXCLUDE_FROM_ALL)
+# SOEM: use local copy if present, otherwise fetch from upstream GitHub so CI works without a submodule
+if(EXISTS "${CMAKE_SOURCE_DIR}/external/soem/CMakeLists.txt")
+  add_subdirectory(external/soem EXCLUDE_FROM_ALL)
+else()
+  include(FetchContent)
+  FetchContent_Declare(
+    soem
+    GIT_REPOSITORY https://github.com/OpenEtherCATsociety/SOEM.git
+    GIT_TAG master
+  )
+  # This will download and add the SOEM project to the build, creating the same targets
+  FetchContent_MakeAvailable(soem)
+endif()
 
 # Addon
 add_library(soem_addon MODULE src/addon.cc)
