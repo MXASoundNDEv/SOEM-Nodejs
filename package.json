@@ -23,6 +23,11 @@
     "auto-scan": "node examples/auto-scan.js",
     "interface-manager": "node examples/interface-manager.js",
     "prepublishOnly": "npm run clean && npm run build && npm test",
+    "release": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1",
+    "release:linux": "bash scripts/release.sh",
+    "release:patch": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 patch",
+    "release:minor": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 minor",
+    "release:major": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 major",
     "production-check": "powershell -ExecutionPolicy Bypass -File scripts/production-check.ps1",
     "production-check:linux": "bash scripts/production-check.sh"
   },
@@ -56,13 +61,26 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ton-org/soem-node.git"
+    "url": "git+https://github.com/MXASoundNDEv/SOEM-Nodejs.git"
   },
+  "bugs": {
+    "url": "https://github.com/MXASoundNDEv/SOEM-Nodejs/issues"
+  },
+  "homepage": "https://github.com/MXASoundNDEv/SOEM-Nodejs#readme",
   "keywords": [
     "ethercat",
     "soem",
     "fieldbus",
-    "industrial"
+    "industrial",
+    "automation",
+    "realtime",
+    "master",
+    "node-addon-api",
+    "typescript",
+    "cross-platform",
+    "network",
+    "interface",
+    "discovery"
   ],
   "author": "MXA.K",
   "license": "GPL-2.0-or-later"

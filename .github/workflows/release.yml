@@ -1,0 +1,257 @@
+name: Release & Publish to NPM
+
+on:
+  push:
+    tags:
+      - "v*"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 1.0.0)"
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # Job 1: Tests et validation avant publication
+  test-before-publish:
+    name: Tests & Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify submodules
+        run: |
+          echo "Checking submodule status..."
+          git submodule status
+          echo "Listing external directory..."
+          ls -la external/
+          if [ ! -f "external/soem/CMakeLists.txt" ]; then
+            echo "SOEM submodule not properly initialized, initializing manually..."
+            git submodule update --init --recursive --force
+            ls -la external/soem/
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript compilation check
+        run: npx tsc --noEmit
+
+      - name: Lint check
+        run: npm run lint:check
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      - name: Run tests with coverage
+        run: npm run test:ci
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  # Job 2: Build multi-plateforme
+  build-binaries:
+    name: Build on ${{ matrix.os }}
+    needs: test-before-publish
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win32
+          - os: macos-latest
+            platform: darwin
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify submodules
+        shell: bash
+        run: |
+          echo "Checking submodule status..."
+          git submodule status
+          echo "Listing external directory..."
+          ls -la external/
+          if [ ! -f "external/soem/CMakeLists.txt" ]; then
+            echo "SOEM submodule not properly initialized, initializing manually..."
+            git submodule update --init --recursive --force
+            ls -la external/soem/
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # Dépendances système pour Linux
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev cmake build-essential
+
+      # Dépendances système pour macOS
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libpcap cmake
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build native addon
+        run: npm run build
+
+      - name: Test binary
+        run: node -e "console.log('Testing binary:'); const { SoemMaster } = require('./dist'); console.log('Interfaces:', SoemMaster.listInterfaces().length);"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-${{ matrix.platform }}
+          path: |
+            build/Release/soem_addon.node
+            dist/
+          retention-days: 1
+
+  # Job 3: Publication NPM
+  publish-npm:
+    name: Publish to NPM
+    needs: [test-before-publish, build-binaries]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify submodules
+        shell: bash
+        run: |
+          echo "Checking submodule status..."
+          git submodule status
+          echo "Listing external directory..."
+          ls -la external/
+          if [ ! -f "external/soem/CMakeLists.txt" ]; then
+            echo "SOEM submodule not properly initialized, initializing manually..."
+            git submodule update --init --recursive --force
+            ls -la external/soem/
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcap-dev cmake build-essential
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Déterminer la version à publier
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      # Mettre à jour la version dans package.json
+      - name: Update package.json version
+        run: |
+          npm version ${{ steps.get_version.outputs.VERSION }} --no-git-tag-version
+          echo "Updated package.json to version ${{ steps.get_version.outputs.VERSION }}"
+
+      - name: Build for publication
+        run: npm run build
+
+      - name: Run final tests
+        run: npm test
+
+      # Publication NPM
+      - name: Publish to NPM
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Créer une release GitHub si pas déjà fait
+      - name: Create GitHub Release
+        if: github.event_name != 'release'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          release_name: Release v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## 🚀 Release v${{ steps.get_version.outputs.VERSION }}
+
+            ### 📦 NPM Package
+            ```bash
+            npm install soem-node@${{ steps.get_version.outputs.VERSION }}
+            ```
+
+            ### 🔗 Links
+            - [NPM Package](https://www.npmjs.com/package/soem-node/v/${{ steps.get_version.outputs.VERSION }})
+            - [Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+
+            ### ✅ Validated on
+            - ✅ Ubuntu Latest
+            - ✅ Windows Latest  
+            - ✅ macOS Latest
+            - ✅ Node.js ${{ env.NODE_VERSION }}
+
+            Automatically generated from CI/CD pipeline.
+          draft: false
+          prerelease: false
+
+  # Job 4: Notification de succès
+  notify-success:
+    name: Notify Success
+    needs: [publish-npm]
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Success notification
+        run: |
+          echo "🎉 Publication réussie !"
+          echo "📦 Package publié sur NPM"
+          echo "🏷️  Version: ${{ needs.publish-npm.outputs.version }}"
+          echo "🔗 NPM: https://www.npmjs.com/package/soem-node"
