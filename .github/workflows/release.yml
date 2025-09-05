@@ -61,7 +61,7 @@ jobs:
         run: npm run test:ci
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage/lcov.info
           flags: unittests
@@ -131,7 +131,7 @@ jobs:
         run: node -e "console.log('Testing binary:'); const { SoemMaster } = require('./dist'); console.log('Interfaces:', SoemMaster.listInterfaces().length);"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-${{ matrix.platform }}
           path: |
@@ -213,33 +213,26 @@ jobs:
       # Créer une release GitHub si pas déjà fait
       - name: Create GitHub Release
         if: github.event_name != 'release'
-        uses: actions/create-release@v1
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          gh release create "v${VERSION}" \
+            --title "Release v${VERSION}" \
+            --notes "## 🚀 Release v${VERSION}
+
+          ### 📦 NPM Package
+          \`\`\`bash
+          npm install soem-node@${VERSION}
+          \`\`\`
+
+          ### 🔗 Links
+          - [NPM Package](https://www.npmjs.com/package/soem-node/v/${VERSION})
+          - [GitHub Repository](https://github.com/MXASoundNDEv/SOEM-Nodejs)
+          - [Documentation](https://github.com/MXASoundNDEv/SOEM-Nodejs#readme)
+
+          ### 📋 Changes
+          See [CHANGELOG.md](https://github.com/MXASoundNDEv/SOEM-Nodejs/blob/main/CHANGELOG.md) for detailed changes."
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          release_name: Release v${{ steps.get_version.outputs.VERSION }}
-          body: |
-            ## 🚀 Release v${{ steps.get_version.outputs.VERSION }}
-
-            ### 📦 NPM Package
-            ```bash
-            npm install soem-node@${{ steps.get_version.outputs.VERSION }}
-            ```
-
-            ### 🔗 Links
-            - [NPM Package](https://www.npmjs.com/package/soem-node/v/${{ steps.get_version.outputs.VERSION }})
-            - [Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
-
-            ### ✅ Validated on
-            - ✅ Ubuntu Latest
-            - ✅ Windows Latest  
-            - ✅ macOS Latest
-            - ✅ Node.js ${{ env.NODE_VERSION }}
-
-            Automatically generated from CI/CD pipeline.
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Job 4: Notification de succès
   notify-success:
