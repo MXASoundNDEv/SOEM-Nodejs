@@ -1,64 +1,138 @@
-name: CI - build native addon and smoke test
+name: CI/CD - Build, Test & Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
+    tags: ["v*"]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: "22"
 
 jobs:
-  build-and-test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [22]
-
+  # Job 1: Tests unitaires et qualité du code
+  test:
+    name: Test & Code Quality
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint:check
+
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Compile TypeScript
+        run: npx tsc --noEmit
+
+      - name: Run tests with coverage
+        run: npm run test:ci
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false
+
+  # Job 2: Build sur différentes plateformes
+  build-and-test:
+    name: Build & Integration Test
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [18, 20, 22]
+        exclude:
+          # Réduire la matrice pour économiser les ressources
+          - os: macos-latest
+            node-version: 18
+          - os: windows-latest
+            node-version: 18
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: "npm"
 
-      - name: Install system deps (Linux)
+      - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libpcap-dev pkg-config python3 python3-pip ninja-build
 
-      - name: Install system deps (macOS)
+      - name: Install system dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
           brew install cmake libpcap pkg-config ninja
 
-      - name: Install deps
-        run: |
-          npm ci
+      - name: Install Node.js dependencies
+        run: npm ci
 
       - name: Build native addon
-        run: |
-          npx cmake-js rebuild --loglevel=info
+        run: npx cmake-js rebuild --loglevel=info
 
-      - name: Ensure .node filename on Windows
-        if: runner.os == 'Windows'
+      - name: Verify build output
+        shell: bash
         run: |
-          if (Test-Path build\\Release\\soem_addon.dll) { Copy-Item build\\Release\\soem_addon.dll build\\Release\\soem_addon.node -Force }
-        shell: pwsh
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ls -la build/Release/
+            file build/Release/soem_addon.node || true
+          else
+            ls -la build/Release/
+            file build/Release/soem_addon.node || true
+          fi
 
-      - name: Smoke test - require module
-        # POSIX smoke test
-        if: runner.os != 'Windows'
+      - name: Run integration tests
         run: |
-          ls -la build/Release || true
-          node -e "try{ const a=require('./build/Release/soem_addon.node'); console.log('exports',Object.keys(a)); const M=a.Master; console.log('Master type',typeof M); const m=new M('lo'); console.log('instantiation ok'); }catch(e){ console.error('smoke test failed', e&&e.message); process.exit(1); }"
+          # Test basic functionality
+          node -e "
+            try {
+              const { SoemMaster } = require('./dist');
+              console.log('✓ Module loads successfully');
+              
+              const interfaces = SoemMaster.listInterfaces();
+              console.log('✓ listInterfaces works, found:', interfaces.length, 'interfaces');
+              
+              const master = new SoemMaster('test');
+              console.log('✓ Master instantiation works');
+              
+              master.close();
+              console.log('✓ Basic smoke test passed');
+            } catch(e) {
+              console.error('✗ Smoke test failed:', e.message);
+              process.exit(1);
+            }
+          "
 
-      - name: Smoke test - require module (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          if (Test-Path build\\Release\\soem_addon.node) { Write-Output 'found build\\Release\\soem_addon.node' } else { Get-ChildItem build\\Release -Force | Write-Output }
-          node -e "try{ const a=require('./build/Release/soem_addon.node'); console.log('exports',Object.keys(a)); const M=a.Master; console.log('Master type',typeof M); const m=new M('lo'); console.log('instantiation ok'); }catch(e){ console.error('smoke test failed', e&&e.message); process.exit(1); }"
+      - name: Upload build artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts-${{ matrix.os }}
+          path: |
+            build/Release/soem_addon.node
+            dist/
+            types/
+          retention-days: 7

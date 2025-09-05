@@ -1,0 +1,259 @@
+// Mock l'addon natif avant l'import
+jest.mock('../build/Release/soem_addon.node', () => {
+  const mockInterfaces = [
+    {
+      name: process.platform === 'win32' ? '\\Device\\NPF_{TEST-GUID-1}' : 'eth0',
+      description: process.platform === 'win32' ? 'Test Network Adapter 1' : 'Ethernet Interface 1'
+    },
+    {
+      name: process.platform === 'win32' ? '\\Device\\NPF_{TEST-GUID-2}' : 'eth1', 
+      description: process.platform === 'win32' ? 'Test Network Adapter 2' : 'Ethernet Interface 2'
+    }
+  ];
+
+  class MockMaster {
+    private ifname: string;
+    private isInitialized = false;
+
+    constructor(ifname = 'eth0') {
+      this.ifname = ifname;
+    }
+
+    init() {
+      if (this.ifname.includes('INVALID') || this.ifname === 'fail') {
+        return false;
+      }
+      this.isInitialized = true;
+      return true;
+    }
+
+    configInit() {
+      if (!this.isInitialized) return 0;
+      return 2; // Mock 2 slaves
+    }
+
+    static listInterfaces() {
+      return mockInterfaces;
+    }
+  }
+
+  return { Master: MockMaster };
+}, { virtual: true });
+
+import { EtherCATUtils } from '../examples/ethercat-utils';
+import { SoemMaster } from '../src/index';
+
+describe('EtherCATUtils', () => {
+  beforeEach(() => {
+    // Reset tous les mocks avant chaque test
+    jest.clearAllMocks();
+    (global as any).mockConsole();
+  });
+
+  afterEach(() => {
+    (global as any).restoreConsole();
+  });
+
+  describe('getAvailableInterfaces', () => {
+    it('should return available interfaces', () => {
+      const interfaces = EtherCATUtils.getAvailableInterfaces();
+      
+      expect(Array.isArray(interfaces)).toBe(true);
+      expect(interfaces.length).toBeGreaterThan(0);
+      
+      interfaces.forEach((iface: any) => {
+        expect(iface).toHaveProperty('name');
+        expect(iface).toHaveProperty('description');
+      });
+    });
+
+    it('should handle errors gracefully', () => {
+      // Mock SoemMaster.listInterfaces to throw an error
+      const spy = jest.spyOn(SoemMaster, 'listInterfaces').mockImplementation(() => {
+        throw new Error('Test error');
+      });
+
+      const interfaces = EtherCATUtils.getAvailableInterfaces();
+      
+      expect(interfaces).toEqual([]);
+      expect(console.warn).toHaveBeenCalledWith(
+        'Warning: Could not list network interfaces:', 
+        'Test error'
+      );
+
+      spy.mockRestore();
+    });
+  });
+
+  describe('findBestInterface', () => {
+    it('should return null when no interfaces available', () => {
+      const spy = jest.spyOn(EtherCATUtils, 'getAvailableInterfaces').mockReturnValue([]);
+      
+      const best = EtherCATUtils.findBestInterface();
+      expect(best).toBeNull();
+      
+      spy.mockRestore();
+    });
+
+    it('should prioritize Intel Gigabit interfaces', () => {
+      const mockInterfaces = [
+        { name: 'loopback', description: 'Loopback' },
+        { name: 'intel', description: 'Intel Gigabit Network Connection' },
+        { name: 'realtek', description: 'Realtek Ethernet' }
+      ];
+      
+      const spy = jest.spyOn(EtherCATUtils, 'getAvailableInterfaces').mockReturnValue(mockInterfaces);
+      
+      const best = EtherCATUtils.findBestInterface();
+      expect(best?.name).toBe('intel');
+      expect(best?.description).toContain('Intel Gigabit');
+      
+      spy.mockRestore();
+    });
+
+    it('should return first interface if no priority match', () => {
+      const mockInterfaces = [
+        { name: 'test1', description: 'Test Interface 1' },
+        { name: 'test2', description: 'Test Interface 2' }
+      ];
+      
+      const spy = jest.spyOn(EtherCATUtils, 'getAvailableInterfaces').mockReturnValue(mockInterfaces);
+      
+      const best = EtherCATUtils.findBestInterface();
+      expect(best?.name).toBe('test1');
+      
+      spy.mockRestore();
+    });
+  });
+
+  describe('testInterface', () => {
+    it('should return true for working interfaces', () => {
+      const result = EtherCATUtils.testInterface('eth0');
+      expect(result).toBe(true);
+    });
+
+    it('should return false for invalid interfaces', () => {
+      const result = EtherCATUtils.testInterface('INVALID_INTERFACE');
+      expect(result).toBe(false);
+    });
+
+    it('should return false when interface throws error', () => {
+      const result = EtherCATUtils.testInterface('fail');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('findWorkingInterface', () => {
+    it('should return first working interface', () => {
+      const mockInterfaces = [
+        { name: 'fail', description: 'Failing Interface' },
+        { name: 'eth0', description: 'Working Interface' },
+        { name: 'eth1', description: 'Another Interface' }
+      ];
+      
+      const spy = jest.spyOn(EtherCATUtils, 'getAvailableInterfaces').mockReturnValue(mockInterfaces);
+      
+      const working = EtherCATUtils.findWorkingInterface();
+      expect(working?.name).toBe('eth0');
+      
+      spy.mockRestore();
+    });
+
+    it('should return null if no interface works', () => {
+      const mockInterfaces = [
+        { name: 'fail1', description: 'Failing Interface 1' },
+        { name: 'fail2', description: 'Failing Interface 2' }
+      ];
+      
+      const spy = jest.spyOn(EtherCATUtils, 'getAvailableInterfaces').mockReturnValue(mockInterfaces);
+      
+      const working = EtherCATUtils.findWorkingInterface();
+      expect(working).toBeNull();
+      
+      spy.mockRestore();
+    });
+  });
+
+  describe('createMaster', () => {
+    it('should create master with preferred interface if working', () => {
+      const master = EtherCATUtils.createMaster('eth0');
+      
+      expect(master).toBeInstanceOf(SoemMaster);
+      expect(console.log).toHaveBeenCalledWith('EtherCAT initialized on: eth0');
+      
+      if (master) {
+        master.close();
+      }
+    });
+
+    it('should fallback to automatic detection if preferred interface fails', () => {
+      const master = EtherCATUtils.createMaster('INVALID_INTERFACE');
+      
+      expect(console.warn).toHaveBeenCalledWith(
+        "Preferred interface 'INVALID_INTERFACE' is not available or working"
+      );
+      
+      if (master) {
+        expect(master).toBeInstanceOf(SoemMaster);
+        master.close();
+      }
+    });
+
+    it('should return null if no working interface found', () => {
+      const spy = jest.spyOn(EtherCATUtils, 'findWorkingInterface').mockReturnValue(null);
+      
+      const master = EtherCATUtils.createMaster();
+      
+      expect(master).toBeNull();
+      expect(console.error).toHaveBeenCalledWith('No working EtherCAT interface found');
+      
+      spy.mockRestore();
+    });
+
+    it('should handle master creation errors', () => {
+      // Mock pour simuler une erreur lors de la création
+      const spy = jest.spyOn(SoemMaster.prototype, 'init').mockImplementation(() => {
+        throw new Error('Creation error');
+      });
+      
+      const master = EtherCATUtils.createMaster('eth0');
+      
+      expect(master).toBeNull();
+      expect(console.error).toHaveBeenCalledWith('Error creating EtherCAT master:', 'Creation error');
+      
+      spy.mockRestore();
+    });
+  });
+
+  describe('printInterfaceInfo', () => {
+    it('should print interface information', () => {
+      EtherCATUtils.printInterfaceInfo();
+      
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Found'));
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('network interface(s):'));
+    });
+
+    it('should print no interfaces message when none available', () => {
+      const spy = jest.spyOn(EtherCATUtils, 'getAvailableInterfaces').mockReturnValue([]);
+      
+      EtherCATUtils.printInterfaceInfo();
+      
+      expect(console.log).toHaveBeenCalledWith('No network interfaces found.');
+      expect(console.log).toHaveBeenCalledWith('Make sure you have WinPcap or Npcap installed and proper permissions.');
+      
+      spy.mockRestore();
+    });
+
+    it('should print recommended interface', () => {
+      const mockBest = { name: 'eth0', description: 'Best Interface' };
+      const spy = jest.spyOn(EtherCATUtils, 'findBestInterface').mockReturnValue(mockBest);
+      
+      EtherCATUtils.printInterfaceInfo();
+      
+      expect(console.log).toHaveBeenCalledWith('Recommended interface: eth0');
+      expect(console.log).toHaveBeenCalledWith('(Best Interface)');
+      
+      spy.mockRestore();
+    });
+  });
+});

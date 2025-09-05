@@ -1,4 +1,10 @@
 export type IfName = string;
+
+export interface NetworkInterface {
+    name: string;
+    description: string;
+}
+
 export class SoemMaster {
     constructor(ifname?: IfName);
     init(): boolean;
@@ -11,4 +17,5 @@ export class SoemMaster {
     sendProcessdata(): number;
     receiveProcessdata(): number;
     close(): void;
+    static listInterfaces(): NetworkInterface[];
 }

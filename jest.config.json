@@ -1,0 +1,22 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>/src", "<rootDir>/test"],
+  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "transform": {
+    "^.+\\.ts$": "ts-jest"
+  },
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/**/*.d.ts",
+    "!src/**/__tests__/**",
+    "!src/**/__mocks__/**"
+  ],
+  "coverageDirectory": "coverage",
+  "coverageReporters": ["text", "lcov", "html"],
+  "testTimeout": 30000,
+  "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
+  "moduleNameMapper": {
+    "^../build/Release/soem_addon\\.node$": "<rootDir>/test/__mocks__/soem_addon.js"
+  }
+}

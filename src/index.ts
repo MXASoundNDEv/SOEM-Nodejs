@@ -1,5 +1,10 @@
 const native: any = require('../build/Release/soem_addon.node');
 
+export interface NetworkInterface {
+  name: string;
+  description: string;
+}
+
 export class SoemMaster {
   private _m: any;
   constructor(ifname: string = 'eth0') {
@@ -15,4 +20,8 @@ export class SoemMaster {
   sendProcessdata(): number { return this._m.sendProcessdata(); }
   receiveProcessdata(): number { return this._m.receiveProcessdata(); }
   close(): void { this._m.close(); }
+  
+  static listInterfaces(): NetworkInterface[] {
+    return native.Master.listInterfaces();
+  }
 }

@@ -8,24 +8,62 @@
     "build": "tsc && cmake-js rebuild",
     "install": "node scripts/postinstall.js",
     "prepare": "npm run build",
-    "example": "node examples/scan-and-read.js"
+    "test": "jest test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
+    "test:watch": "jest --watch test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
+    "test:coverage": "jest --coverage test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
+    "test:ci": "jest --ci --coverage --watchAll=false test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
+    "test:all": "jest",
+    "lint": "eslint src/**/*.ts types/**/*.ts --fix",
+    "lint:check": "eslint src/**/*.ts types/**/*.ts",
+    "security": "npm audit",
+    "test-ci": "bash scripts/test-ci.sh",
+    "test-ci:windows": "powershell -ExecutionPolicy Bypass -File scripts/test-ci.ps1",
+    "example": "node examples/scan-and-read.js",
+    "list-interfaces": "node examples/list-interfaces.js",
+    "auto-scan": "node examples/auto-scan.js",
+    "interface-manager": "node examples/interface-manager.js",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
+    "production-check": "powershell -ExecutionPolicy Bypass -File scripts/production-check.ps1",
+    "production-check:linux": "bash scripts/production-check.sh"
   },
   "gypfile": false,
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
+    "@types/jest": "^29.5.5",
     "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "cmake-js": "^7.3.0",
-    "node-addon-api": "^8.0.0",
+    "eslint": "^8.50.0",
+    "eslint-plugin-node": "^11.1.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.6.0"
   },
-  "dependencies": {},
-  "os": ["linux", "darwin", "win32"],
-  "cpu": ["x64", "arm64"],
+  "dependencies": {
+    "node-addon-api": "^8.0.0"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ton-org/soem-node.git"
   },
-  "keywords": ["ethercat", "soem", "fieldbus", "industrial"],
+  "keywords": [
+    "ethercat",
+    "soem",
+    "fieldbus",
+    "industrial"
+  ],
   "author": "MXA.K",
   "license": "GPL-2.0-or-later"
 }
