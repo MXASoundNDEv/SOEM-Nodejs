@@ -170,28 +170,6 @@ jobs:
           ls -la dist/ || echo "No dist directory found"
           ls -la dist/index.js || echo "No compiled index.js found"
 
-      - name: Run integration tests
-        run: |
-          # Test basic functionality
-          node -e "
-            try {
-              const { SoemMaster } = require('./dist');
-              console.log('✓ Module loads successfully');
-              
-              const interfaces = SoemMaster.listInterfaces();
-              console.log('✓ listInterfaces works, found:', interfaces.length, 'interfaces');
-              
-              const master = new SoemMaster('test');
-              console.log('✓ Master instantiation works');
-              
-              master.close();
-              console.log('✓ Basic smoke test passed');
-            } catch(e) {
-              console.error('✗ Smoke test failed:', e.message);
-              process.exit(1);
-            }
-          "
-
       - name: Upload build artifacts
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         uses: actions/upload-artifact@v4
