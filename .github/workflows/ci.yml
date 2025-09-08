@@ -168,9 +168,13 @@ jobs:
       - name: Build native addon
         run: npx cmake-js rebuild --loglevel=info
 
+      - name: Compile TypeScript
+        run: npx tsc
+
       - name: Verify build output
         shell: bash
         run: |
+          echo "Checking build output..."
           if [ "$RUNNER_OS" == "Windows" ]; then
             ls -la build/Release/
             file build/Release/soem_addon.node || true
@@ -178,6 +182,10 @@ jobs:
             ls -la build/Release/
             file build/Release/soem_addon.node || true
           fi
+          
+          echo "Checking TypeScript compilation..."
+          ls -la dist/ || echo "No dist directory found"
+          ls -la dist/index.js || echo "No compiled index.js found"
 
       - name: Run integration tests
         run: |
