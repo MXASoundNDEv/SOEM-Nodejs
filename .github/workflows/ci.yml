@@ -182,7 +182,7 @@ jobs:
             ls -la build/Release/
             file build/Release/soem_addon.node || true
           fi
-          
+
           echo "Checking TypeScript compilation..."
           ls -la dist/ || echo "No dist directory found"
           ls -la dist/index.js || echo "No compiled index.js found"
