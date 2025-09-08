@@ -94,26 +94,48 @@ jobs:
           if [ ! -f "external/soem/CMakeLists.txt" ]; then
             echo "SOEM submodule not properly initialized, trying multiple methods..."
             
-            # Method 1: Force submodule update
+            # Method 1: Force submodule update with fresh start
+            git submodule deinit -f external/soem || true
+            rm -rf external/soem
             git submodule update --init --recursive --force || echo "Method 1 failed"
             
-            # Method 2: If still not found, clone directly
+            # Method 2: If still not found, clone with proper depth and checkout
             if [ ! -f "external/soem/CMakeLists.txt" ]; then
-              echo "Direct clone fallback..."
+              echo "Direct clone fallback with proper checkout..."
               rm -rf external/soem
-              git clone https://github.com/OpenEtherCATsociety/SOEM.git external/soem
+              git clone --depth=1 --branch=master https://github.com/OpenEtherCATsociety/SOEM.git external/soem
+              
+              # Verify critical files exist
+              if [ ! -f "external/soem/cmake/Darwin.cmake" ]; then
+                echo "Missing Darwin.cmake, trying full clone..."
+                rm -rf external/soem
+                git clone https://github.com/OpenEtherCATsociety/SOEM.git external/soem
+              fi
             fi
             
             # Verify final state
             if [ ! -f "external/soem/CMakeLists.txt" ]; then
-              echo "ERROR: Could not initialize SOEM submodule"
+              echo "ERROR: Could not initialize SOEM submodule properly"
+              echo "Missing files check:"
+              ls -la external/soem/ || echo "Directory doesn't exist"
               exit 1
             fi
             
             echo "SOEM successfully initialized:"
             ls -la external/soem/
+            echo "SOEM cmake directory:"
+            ls -la external/soem/cmake/
           else
             echo "SOEM submodule already properly initialized"
+          fi
+
+          # Create Darwin.cmake if missing (macOS support)
+          if [ ! -f "external/soem/cmake/Darwin.cmake" ]; then
+            echo "Creating missing Darwin.cmake for macOS support..."
+            cp external/soem/cmake/Linux.cmake external/soem/cmake/Darwin.cmake
+            # Remove rt library dependency for macOS
+            sed -i 's/target_link_libraries(soem PUBLIC pthread rt)/target_link_libraries(soem PUBLIC pthread)/' external/soem/cmake/Darwin.cmake
+            echo "Darwin.cmake created successfully"
           fi
 
       - name: Setup Node.js ${{ matrix.node-version }}
