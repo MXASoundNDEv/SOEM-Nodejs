@@ -8,7 +8,7 @@ Votre bibliothèque SOEM Node.js est maintenant **prête pour la production** av
 
 #### 1. **Découverte d'interfaces réseau cross-platform** ✅
 - ✅ Support Windows (WinPcap/Npcap)
-- ✅ Support Linux/macOS (libpcap)  
+- ✅ Support Linux (libpcap)  
 - ✅ Détection automatique des interfaces
 - ✅ Sélection intelligente de la meilleure interface
 - ✅ Test de connectivité des interfaces
@@ -21,7 +21,7 @@ Votre bibliothèque SOEM Node.js est maintenant **prête pour la production** av
 - ✅ Tests isolés et reproductibles
 
 #### 3. **Pipeline CI/CD GitHub Actions** ✅
-- ✅ **Multi-plateforme** (Windows, Linux, macOS)
+- ✅ **Multi-plateforme** (Windows, Linux)
 - ✅ **Tests automatisés** sur chaque commit/PR
 - ✅ **Audit de sécurité** automatique
 - ✅ **Lint et type-checking** TypeScript
@@ -41,7 +41,7 @@ Votre bibliothèque SOEM Node.js est maintenant **prête pour la production** av
 ✅ Sécurité : 0 vulnérabilités
 ✅ Type Safety : TypeScript strict
 ✅ Linting : ESLint configuré
-✅ Platforms : Windows/Linux/macOS
+✅ Platforms : Windows/Linux
 ```
 
 ### 🔧 Commandes de développement

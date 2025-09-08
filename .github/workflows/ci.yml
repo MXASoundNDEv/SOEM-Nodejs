@@ -68,12 +68,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
         node-version: [18, 20, 22]
         exclude:
           # Réduire la matrice pour économiser les ressources
-          - os: macos-latest
-            node-version: 18
           - os: windows-latest
             node-version: 18
 
@@ -129,13 +127,10 @@ jobs:
             echo "SOEM submodule already properly initialized"
           fi
 
-          # Create Darwin.cmake if missing (macOS support)
-          if [ ! -f "external/soem/cmake/Darwin.cmake" ]; then
-            echo "Creating missing Darwin.cmake for macOS support..."
-            cp external/soem/cmake/Linux.cmake external/soem/cmake/Darwin.cmake
-            # Remove rt library dependency for macOS
-            sed -i 's/target_link_libraries(soem PUBLIC pthread rt)/target_link_libraries(soem PUBLIC pthread)/' external/soem/cmake/Darwin.cmake
-            echo "Darwin.cmake created successfully"
+          # Create Linux.cmake backup if missing (Linux support)
+          if [ ! -f "external/soem/cmake/Linux.cmake" ]; then
+            echo "Missing Linux.cmake, checking for alternatives..."
+            ls -la external/soem/cmake/
           fi
 
       - name: Setup Node.js ${{ matrix.node-version }}
@@ -149,18 +144,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libpcap-dev pkg-config python3 python3-pip ninja-build
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          # Handle potential cmake conflicts
-          if brew list cmake >/dev/null 2>&1; then
-            echo "CMake already installed, skipping..."
-          else
-            brew install cmake
-          fi
-          brew install libpcap pkg-config ninja
 
       - name: Install Node.js dependencies
         run: npm ci

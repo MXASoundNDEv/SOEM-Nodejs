@@ -113,7 +113,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     echo "📊 Prochaines étapes:"
     echo "   1. GitHub Actions va démarrer automatiquement"
-    echo "   2. Tests sur Windows/Linux/macOS"
+    echo "   2. Tests sur Windows/Linux"
     echo "   3. Build des binaires natifs"
     echo "   4. Publication sur NPM"
     echo "   5. Création de la release GitHub"

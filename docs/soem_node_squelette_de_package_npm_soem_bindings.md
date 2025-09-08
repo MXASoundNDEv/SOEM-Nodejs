@@ -2,7 +2,7 @@
 
 Ce dépôt te donne un squelette complet pour publier un package NPM qui wrappe **SOEM** (bibliothèque C) via **Node-API (N-API)**. Il se construit avec **cmake-js** et inclut des typings TypeScript.
 
-> Compatible Linux x64/arm64 (RAW Ethernet requis). Windows/macOS possibles mais non testés ici.
+> Compatible Linux x64/arm64 (RAW Ethernet requis). Windows possibles mais non testés ici.
 
 ---
 
@@ -426,7 +426,7 @@ git submodule add https://github.com/OpenEtherCATsociety/SOEM.git external/soem
 
 ## Remarques
 - Cette API est volontairement *proche* de la C-API SOEM. On pourra ajouter des helpers de haut niveau (mapping PDO typé, discovery avec ESI, watchdog, etc.).
-- Pour Windows/macOS, ajuste `target_link_libraries` (WinPcap/Npcap sous Windows; pas de RAW frames standard sous macOS).
+- Pour Windows, ajuste `target_link_libraries` (WinPcap/Npcap sous Windows).
 - Pour publier sur NPM avec binaires précompilés: intègre `prebuildify`/`node-pre-gyp`.
 - Tests à ajouter (Jest) + CI (GitHub Actions) pour build matrix (linux-x64, linux-arm64).
 

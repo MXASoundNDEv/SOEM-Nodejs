@@ -18,7 +18,7 @@
 - C++ Compiler (GCC/Clang/MSVC)
 - Platform-specific libraries:
   - **Windows**: WinPcap or Npcap
-  - **Linux/macOS**: libpcap-dev
+  - **Linux**: libpcap-dev
 
 ### Local Development
 ```bash

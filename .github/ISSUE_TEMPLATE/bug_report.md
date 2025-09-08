@@ -25,7 +25,7 @@ If applicable, add screenshots to help explain your problem.
 
 ## 🖥️ Environment
 **Desktop (please complete the following information):**
- - OS: [e.g. Windows 11, Ubuntu 22.04, macOS 13]
+ - OS: [e.g. Windows 11, Ubuntu 22.04]
  - Node.js Version: [e.g. 18.17.0]
  - NPM Version: [e.g. 9.8.1]
  - Package Version: [e.g. 0.1.0]

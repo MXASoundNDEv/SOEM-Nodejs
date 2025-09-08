@@ -114,7 +114,7 @@ if ($confirm -eq "y" -or $confirm -eq "Y") {
     Write-Host ""
     Write-Host "📊 Prochaines étapes:" -ForegroundColor Cyan
     Write-Host "   1. GitHub Actions va démarrer automatiquement" -ForegroundColor White
-    Write-Host "   2. Tests sur Windows/Linux/macOS" -ForegroundColor White
+    Write-Host "   2. Tests sur Windows/Linux" -ForegroundColor White
     Write-Host "   3. Build des binaires natifs" -ForegroundColor White
     Write-Host "   4. Publication sur NPM" -ForegroundColor White
     Write-Host "   5. Création de la release GitHub" -ForegroundColor White

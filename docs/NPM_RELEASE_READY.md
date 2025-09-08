@@ -3,14 +3,14 @@
 ## ✅ Ce qui a été créé
 
 ### 🚀 Workflow GitHub Actions (`release.yml`)
-- **Tests multi-plateforme** : Ubuntu, Windows, macOS
+- **Tests multi-plateforme** : Ubuntu, Windows
 - **Build natif** automatique sur toutes les plateformes
 - **Publication NPM** automatique sur push de tag
 - **Création de release GitHub** avec notes automatiques
 - **Upload d'artifacts** et validation
 
 ### 📦 Scripts de Release
-- **`scripts/release.sh`** : Script Bash pour Linux/macOS
+- **`scripts/release.sh`** : Script Bash pour Linux
 - **`scripts/release.ps1`** : Script PowerShell pour Windows
 - **NPM scripts** : `npm run release:patch/minor/major`
 
@@ -38,7 +38,7 @@ npm run release:patch
 
 ### Workflow Automatique
 1. **Tag créé** → GitHub Actions démarre
-2. **Tests** sur Windows/Linux/macOS  
+2. **Tests** sur Windows/Linux  
 3. **Build** des binaires natifs
 4. **Publication** automatique sur NPM
 5. **Release** GitHub créée

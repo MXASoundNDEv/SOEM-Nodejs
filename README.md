@@ -4,14 +4,14 @@
 [![npm version](https://badge.fury.io/js/soem-node.svg)](https://badge.fury.io/js/soem-node)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)](https://github.com/MXASoundNDEv/SOEM-Nodejs)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/MXASoundNDEv/SOEM-Nodejs)
 
 Bindings Node.js haute performance pour [SOEM (Simple Open EtherCAT Master)](https://github.com/OpenEtherCATsociety/SOEM) avec détection automatique des interfaces réseau et utilitaires de gestion avancés.
 
 ## 🚀 Fonctionnalités
 
 - ✅ **Détection automatique d'interfaces** - Trouve automatiquement les meilleures interfaces EtherCAT
-- ✅ **Support multi-plateforme** - Windows, Linux, macOS (x64, arm64)
+- ✅ **Support multi-plateforme** - Windows, Linux (x64, arm64)
 - ✅ **TypeScript complet** - Types de sécurité avec auto-complétion
 - ✅ **API moderne** - Interface intuitive et bien documentée
 - ✅ **Utilitaires intégrés** - Outils de gestion et de diagnostic
@@ -34,7 +34,7 @@ npm install soem-node
 - **WinPcap** ou **Npcap** (pour l'accès réseau)
 - **Visual Studio Build Tools** ou **Visual Studio**
 
-#### Linux/macOS
+#### Linux
 - **libpcap-dev** (Ubuntu/Debian) ou **libpcap** (autres distributions)
 - **Permissions réseau** pour les sockets bruts
 
@@ -157,7 +157,7 @@ Le projet maintient une couverture de code élevée avec des tests unitaires et 
 ### CI/CD
 
 Le projet utilise GitHub Actions pour :
-- ✅ Tests automatisés sur Windows, Linux, macOS
+- ✅ Tests automatisés sur Windows, Linux
 - ✅ Vérification TypeScript et ESLint
 - ✅ Audit de sécurité
 - ✅ Build multi-plateforme

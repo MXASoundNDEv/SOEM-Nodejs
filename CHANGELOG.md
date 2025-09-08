@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release of SOEM Node.js bindings
 - Support for EtherCAT master functionality
-- Cross-platform network interface discovery (Windows/Linux/macOS)
+- Cross-platform network interface discovery (Windows/Linux)
 - TypeScript support with comprehensive type definitions
 - Native C++ addon with Node-API 8 compatibility
 - Comprehensive utility library for interface management
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Network Interface Management:**
   - Automatic interface discovery
-  - Cross-platform compatibility (WinPcap/Npcap on Windows, libpcap on Linux/macOS)
+  - Cross-platform compatibility (WinPcap/Npcap on Windows, libpcap on Linux)
   - Best interface selection algorithms
   - Interface testing and validation
 
@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of SOEM-Nodejs
 - Core EtherCAT master functionality
 - Network interface discovery and management
-- Cross-platform support (Windows, Linux, macOS)
+- Cross-platform support (Windows, Linux)
 - TypeScript support with full type definitions
 - Comprehensive examples and utilities
 - Automatic interface detection and selection
@@ -91,7 +91,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Supported Platforms
 - Windows (x64, arm64) with WinPcap/Npcap
 - Linux (x64, arm64) with libpcap
-- macOS (x64, arm64) with libpcap
 
 [Unreleased]: https://github.com/MXASoundNDEv/SOEM-Nodejs/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/MXASoundNDEv/SOEM-Nodejs/releases/tag/v0.1.0

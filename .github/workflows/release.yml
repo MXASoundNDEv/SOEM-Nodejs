@@ -73,14 +73,12 @@ jobs:
     needs: test-before-publish
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
         include:
           - os: ubuntu-latest
             platform: linux
           - os: windows-latest
             platform: win32
-          - os: macos-latest
-            platform: darwin
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -110,13 +108,6 @@ jobs:
               echo "Direct clone fallback with proper checkout..."
               rm -rf external/soem
               git clone --depth=1 --branch=master https://github.com/OpenEtherCATsociety/SOEM.git external/soem
-              
-              # Verify critical files exist
-              if [ ! -f "external/soem/cmake/Darwin.cmake" ]; then
-                echo "Missing Darwin.cmake, trying full clone..."
-                rm -rf external/soem
-                git clone https://github.com/OpenEtherCATsociety/SOEM.git external/soem
-              fi
             fi
             
             # Verify final state
@@ -135,13 +126,10 @@ jobs:
             echo "SOEM submodule already properly initialized"
           fi
 
-          # Create Darwin.cmake if missing (macOS support)
-          if [ ! -f "external/soem/cmake/Darwin.cmake" ]; then
-            echo "Creating missing Darwin.cmake for macOS support..."
-            cp external/soem/cmake/Linux.cmake external/soem/cmake/Darwin.cmake
-            # Remove rt library dependency for macOS
-            sed -i 's/target_link_libraries(soem PUBLIC pthread rt)/target_link_libraries(soem PUBLIC pthread)/' external/soem/cmake/Darwin.cmake
-            echo "Darwin.cmake created successfully"
+          # Create Linux.cmake backup if missing (Linux support)
+          if [ ! -f "external/soem/cmake/Linux.cmake" ]; then
+            echo "Missing Linux.cmake, checking for alternatives..."
+            ls -la external/soem/cmake/
           fi
 
       - name: Setup Node.js
@@ -156,18 +144,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpcap-dev cmake build-essential
-
-      # Dépendances système pour macOS
-      - name: Install system dependencies (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          # Handle potential cmake conflicts
-          if brew list cmake >/dev/null 2>&1; then
-            echo "CMake already installed, skipping..."
-          else
-            brew install cmake
-          fi
-          brew install libpcap
 
       - name: Install dependencies
         run: npm ci
@@ -293,5 +269,4 @@ jobs:
         run: |
           echo "🎉 Publication réussie !"
           echo "📦 Package publié sur NPM"
-          echo "🏷️  Version: ${{ needs.publish-npm.outputs.version }}"
           echo "🔗 NPM: https://www.npmjs.com/package/soem-node"

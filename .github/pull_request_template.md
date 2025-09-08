@@ -14,7 +14,7 @@ Brief description of what this PR does.
 - [ ] Unit tests pass
 - [ ] Integration tests pass
 - [ ] Manual testing performed
-- [ ] Tested on multiple platforms (Windows/Linux/macOS)
+- [ ] Tested on multiple platforms (Windows/Linux)
 
 **Test Configuration:**
 - Node.js version:

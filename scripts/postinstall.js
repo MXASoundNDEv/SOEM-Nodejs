@@ -8,7 +8,6 @@ console.log('[soem-node] Post-install setup...');
 // Check and initialize SOEM submodule if needed
 const soemPath = path.join(__dirname, '..', 'external', 'soem');
 const soemCMake = path.join(soemPath, 'CMakeLists.txt');
-const darwinCMake = path.join(soemPath, 'cmake', 'Darwin.cmake');
 
 if (!fs.existsSync(soemCMake)) {
   console.log('[soem-node] SOEM submodule not found, initializing...');
@@ -58,34 +57,6 @@ if (!fs.existsSync(soemCMake)) {
   console.log('[soem-node] SOEM successfully initialized');
 }
 
-// Create Darwin.cmake if missing (for macOS support)
-if (!fs.existsSync(darwinCMake)) {
-  console.log('[soem-node] Creating Darwin.cmake for macOS support...');
-  const linuxCMake = path.join(soemPath, 'cmake', 'Linux.cmake');
-
-  if (fs.existsSync(linuxCMake)) {
-    // Copy Linux.cmake to Darwin.cmake
-    let darwinContent = fs.readFileSync(linuxCMake, 'utf8');
-
-    // Remove rt library dependency for macOS (not available on macOS)
-    darwinContent = darwinContent.replace(
-      'target_link_libraries(soem PUBLIC pthread rt)',
-      'target_link_libraries(soem PUBLIC pthread)'
-    );
-
-    // Add comment about macOS
-    darwinContent = darwinContent.replace(
-      '# This software is dual-licensed under GPLv3 and a commercial',
-      '# macOS (Darwin) configuration - based on Linux with modifications\n# This software is dual-licensed under GPLv3 and a commercial'
-    );
-
-    fs.writeFileSync(darwinCMake, darwinContent);
-    console.log('[soem-node] Darwin.cmake created successfully');
-  } else {
-    console.warn('[soem-node] Warning: Could not create Darwin.cmake (Linux.cmake not found)');
-  }
-}
-
 console.log('[soem-node] Building native addon with cmake-js...');
 
 // Try different approaches for running cmake-js
@@ -119,7 +90,6 @@ if (res.status !== 0) {
   console.error('- Working directory:', process.cwd());
   console.error('- SOEM path exists:', fs.existsSync(soemPath));
   console.error('- CMakeLists.txt exists:', fs.existsSync(soemCMake));
-  console.error('- Darwin.cmake exists:', fs.existsSync(darwinCMake));
   console.error('- Exit code:', res.status);
   console.error('- Signal:', res.signal);
   if (res.error) {

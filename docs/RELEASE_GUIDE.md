@@ -67,7 +67,6 @@ Une fois le tag poussé, GitHub Actions va automatiquement :
 ### 1. **Tests Multi-plateforme** 
 - ✅ Ubuntu Latest
 - ✅ Windows Latest  
-- ✅ macOS Latest
 
 ### 2. **Build Natif**
 - ✅ Compilation des binaires natifs
