@@ -31,7 +31,9 @@ npm install soem-node
 - **Compilateur C++** (gcc/clang/MSVC)
 
 #### Windows
-- **WinPcap** ou **Npcap** (pour l'accès réseau)
+- **Npcap** (recommandé) ou **WinPcap** (pour l'accès réseau)
+  - Téléchargez depuis [npcap.com](https://npcap.com/#download)
+  - Installation requise pour les opérations réseau
 - **Visual Studio Build Tools** ou **Visual Studio**
 
 #### Linux

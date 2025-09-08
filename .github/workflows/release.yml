@@ -148,15 +148,76 @@ jobs:
       # Dépendances système pour Windows
       - name: Install system dependencies (Windows)
         if: matrix.os == 'windows-latest'
+        shell: powershell
+        continue-on-error: true
         run: |
-          # Install Npcap for packet capture on Windows
-          choco install npcap -y
-          # Verify installation
-          if (Test-Path "C:\Windows\System32\Packet.dll") {
-            Write-Host "Npcap installed successfully"
+      # Dépendances système pour Windows
+      - name: Install system dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        continue-on-error: true
+        run: |
+          Write-Host "Setting up Windows build environment..."
+
+          # Check for existing packet capture libraries
+          $packetDllPath = "C:\Windows\System32\Packet.dll"
+          $wpcapDllPath = "C:\Windows\System32\wpcap.dll"
+          $npcapDllPath = "C:\Windows\System32\Npcap\Packet.dll"
+
+          Write-Host "Checking for existing packet capture libraries..."
+          if (Test-Path $packetDllPath) {
+            Write-Host "✓ Packet.dll found in System32 - WinPcap compatible mode installed"
+          } elseif (Test-Path $npcapDllPath) {
+            Write-Host "✓ Packet.dll found in Npcap directory - Npcap installed"
+          } elseif (Test-Path $wpcapDllPath) {
+            Write-Host "✓ wpcap.dll found - Legacy WinPcap available"
           } else {
-            Write-Host "Warning: Npcap may not be properly installed"
+            Write-Host "⚠ No packet capture library detected"
+            Write-Host "ℹ️ This is expected in CI environments"
           }
+
+          # Check for Npcap service (more reliable indicator)
+          try {
+            $npcapService = Get-Service -Name "npcap" -ErrorAction SilentlyContinue
+            if ($npcapService) {
+              Write-Host "✓ Npcap service found: $($npcapService.Status)"
+            } else {
+              Write-Host "ℹ️ Npcap service not found (expected in CI)"
+            }
+          } catch {
+            Write-Host "ℹ️ Cannot check Npcap service status"
+          }
+
+          # Note about packet capture in CI
+          Write-Host ""
+          Write-Host "📌 Important notes for CI environment:"
+          Write-Host "   • Packet capture libraries are runtime dependencies"
+          Write-Host "   • The native module can be built without them installed"
+          Write-Host "   • Network operations will fail gracefully in CI"
+          Write-Host "   • Users need to install Npcap/WinPcap on target systems"
+
+          # Ensure we have the Visual Studio build tools available
+          Write-Host ""
+          Write-Host "Checking build tools..."
+          try {
+            $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            if (Test-Path $vsWhere) {
+              $vs = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+              if ($vs) {
+                Write-Host "✓ Visual Studio found at: $vs"
+              }
+            }
+          } catch {
+            Write-Host "ℹ️ Visual Studio detection: $($_.Exception.Message)"
+          }
+
+          if (Get-Command "cl.exe" -ErrorAction SilentlyContinue) {
+            Write-Host "✓ Visual Studio compiler accessible"
+          } else {
+            Write-Host "ℹ️ Visual Studio compiler not in PATH (cmake-js will find it)"
+          }
+
+          Write-Host "✅ Windows build environment setup completed"
 
       - name: Install dependencies
         run: npm ci
