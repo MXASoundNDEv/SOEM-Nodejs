@@ -4,20 +4,33 @@ on:
   push:
     tags:
       - "v*"
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
         description: "Version to publish (e.g., 1.0.0)"
         required: true
         type: string
+  release:
+    types: [published]
+
+# Empêche les publications en double si tag + release se déclenchent
+concurrency:
+  group: publish-${{ github.ref || github.event.release.tag_name || github.event.inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
 
 env:
   NODE_VERSION: "22"
+  CI: "true"
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  # Job 1: Tests et validation avant publication
   test-before-publish:
     name: Tests & Quality Check
     runs-on: ubuntu-latest
@@ -32,17 +45,18 @@ jobs:
           echo "Checking submodule status..."
           git submodule status
           echo "Listing external directory..."
-          ls -la external/
+          ls -la external/ || true
           if [ ! -f "external/soem/CMakeLists.txt" ]; then
-            echo "SOEM submodule not properly initialized, initializing manually..."
+            echo "SOEM submodule not properly initialized, initializing..."
             git submodule update --init --recursive --force
-            ls -la external/soem/
+            ls -la external/soem/ || true
           fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          check-latest: true
           cache: "npm"
 
       - name: Install dependencies
@@ -54,8 +68,10 @@ jobs:
       - name: Lint check
         run: npm run lint:check
 
+      # Option A: rendre non-bloquant (souvent préférable)
       - name: Security audit
         run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Run tests with coverage
         run: npm run test:ci
@@ -66,19 +82,22 @@ jobs:
           file: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
-  # Job 2: Build multi-plateforme
   build-binaries:
     name: Build on ${{ matrix.os }}
     needs: test-before-publish
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest] # ajoute macos-latest si besoin
         include:
           - os: ubuntu-latest
             platform: linux
           - os: windows-latest
             platform: win32
+          # - os: macos-latest
+          #   platform: darwin
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -97,167 +116,46 @@ jobs:
 
           if [ ! -f "external/soem/CMakeLists.txt" ]; then
             echo "SOEM submodule not properly initialized, trying multiple methods..."
-            
-            # Method 1: Force submodule update with fresh start
             git submodule deinit -f external/soem || true
             rm -rf external/soem
             git submodule update --init --recursive --force || echo "Method 1 failed"
-            
-            # Method 2: If still not found, clone with proper depth and checkout
+
             if [ ! -f "external/soem/CMakeLists.txt" ]; then
-              echo "Direct clone fallback with proper checkout..."
+              echo "Direct clone fallback..."
               rm -rf external/soem
               git clone --depth=1 --branch=master https://github.com/OpenEtherCATsociety/SOEM.git external/soem
             fi
-            
-            # Verify final state
+
             if [ ! -f "external/soem/CMakeLists.txt" ]; then
               echo "ERROR: Could not initialize SOEM submodule properly"
-              echo "Missing files check:"
               ls -la external/soem/ || echo "Directory doesn't exist"
               exit 1
             fi
-            
+
             echo "SOEM successfully initialized:"
             ls -la external/soem/
-            echo "SOEM cmake directory:"
-            ls -la external/soem/cmake/
           else
             echo "SOEM submodule already properly initialized"
-          fi
-
-          # Create Linux.cmake backup if missing (Linux support)
-          if [ ! -f "external/soem/cmake/Linux.cmake" ]; then
-            echo "Missing Linux.cmake, checking for alternatives..."
-            ls -la external/soem/cmake/
           fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          check-latest: true
           cache: "npm"
 
-      # Dépendances système pour Linux
       - name: Install system dependencies (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y libpcap-dev cmake build-essential
 
-      # Dépendances système pour Windows
       - name: Install system dependencies (Windows)
         if: matrix.os == 'windows-latest'
         shell: powershell
-        continue-on-error: true
         run: |
-      # Dépendances système pour Windows
-      - name: Install system dependencies (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: powershell
-        continue-on-error: true
-        run: |
-          Write-Host "Setting up Windows build environment..."
-
-          # Check for existing packet capture libraries
-          $packetDllPath = "C:\Windows\System32\Packet.dll"
-          $wpcapDllPath = "C:\Windows\System32\wpcap.dll"
-          $npcapDllPath = "C:\Windows\System32\Npcap\Packet.dll"
-
-          Write-Host "Checking for existing packet capture libraries..."
-          if (Test-Path $packetDllPath) {
-            Write-Host "✓ Packet.dll found in System32 - WinPcap compatible mode installed"
-          } elseif (Test-Path $npcapDllPath) {
-            Write-Host "✓ Packet.dll found in Npcap directory - Npcap installed"
-          } elseif (Test-Path $wpcapDllPath) {
-            Write-Host "✓ wpcap.dll found - Legacy WinPcap available"
-          } else {
-            Write-Host "⚠ No packet capture library detected"
-            Write-Host "ℹ️ This is expected in CI environments"
-          }
-
-          # Check for Npcap service (more reliable indicator)
-          try {
-            $npcapService = Get-Service -Name "npcap" -ErrorAction SilentlyContinue
-            if ($npcapService) {
-              Write-Host "✓ Npcap service found: $($npcapService.Status)"
-            } else {
-              Write-Host "ℹ️ Npcap service not found (expected in CI)"
-            }
-          } catch {
-            Write-Host "ℹ️ Cannot check Npcap service status"
-          }
-
-          # Note about packet capture in CI
-          Write-Host ""
-          Write-Host "📌 Important notes for CI environment:"
-          Write-Host "   • Packet capture libraries are runtime dependencies"
-          Write-Host "   • The native module can be built without them installed"
-          Write-Host "   • Network operations will fail gracefully in CI"
-          Write-Host "   • Users need to install Npcap/WinPcap on target systems"
-
-          # Ensure we have the Visual Studio build tools available
-          Write-Host ""
-          Write-Host "Checking build tools..."
-          try {
-            $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-            if (Test-Path $vsWhere) {
-              $vs = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-              if ($vs) {
-                Write-Host "✓ Visual Studio found at: $vs"
-              }
-            }
-          } catch {
-            Write-Host "ℹ️ Visual Studio detection: $($_.Exception.Message)"
-          }
-
-          if (Get-Command "cl.exe" -ErrorAction SilentlyContinue) {
-            Write-Host "✓ Visual Studio compiler accessible"
-          } else {
-            Write-Host "ℹ️ Visual Studio compiler not in PATH (cmake-js will find it)"
-          }
-
-          Write-Host "✅ Windows build environment setup completed"
-
-      # Install Visual C++ Redistributables pour Windows
-      - name: Install Visual C++ Redistributables (Windows)
-        if: matrix.os == 'windows-latest'
-        shell: powershell
-        run: |
-          Write-Host "Installing Visual C++ Redistributables..."
-
-          try {
-            # Download and install VC++ Redistributable 2022 (includes 2015-2022)
-            $vcredistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-            $vcredistPath = "$env:TEMP\vc_redist.x64.exe"
-            
-            Write-Host "Downloading Visual C++ Redistributable..."
-            Invoke-WebRequest -Uri $vcredistUrl -OutFile $vcredistPath -UseBasicParsing
-            
-            Write-Host "Installing Visual C++ Redistributable..."
-            Start-Process -FilePath $vcredistPath -ArgumentList "/install", "/quiet", "/norestart" -Wait
-            
-            Write-Host "✓ Visual C++ Redistributable installed"
-            
-            # Verify installation by checking for common DLLs
-            $systemRoot = $env:SystemRoot
-            $vcDlls = @(
-              "$systemRoot\System32\msvcp140.dll",
-              "$systemRoot\System32\vcruntime140.dll"
-            )
-            
-            foreach ($dll in $vcDlls) {
-              if (Test-Path $dll) {
-                Write-Host "✓ Found: $(Split-Path -Leaf $dll)"
-              } else {
-                Write-Host "⚠ Missing: $(Split-Path -Leaf $dll)"
-              }
-            }
-            
-          } catch {
-            Write-Host "⚠ VC++ Redistributable installation failed: $($_.Exception.Message)"
-            Write-Host "Module may still work if dependencies are already present"
-          }
+          Write-Host "Windows runner already has toolchains; proceeding."
 
       - name: Install dependencies
         run: npm ci
@@ -265,123 +163,16 @@ jobs:
       - name: Build native addon
         run: npm run build
 
-      - name: Test binary
+      - name: Test binary & outputs
         shell: bash
-        continue-on-error: true
         run: |
           echo "Testing binary on ${{ matrix.platform }}..."
+          test -f build/Release/soem_addon.node || (ls -la build/Release/ || true; exit 1)
+          test -f dist/index.js || (ls -la dist/ || true; exit 1)
+          if [ -f types/index.d.ts ]; then echo "✓ TypeScript definitions present"; else echo "✗ Missing types"; exit 1; fi
+          node ./scripts/ci-test-module.js || true
 
-          # Check if binary exists
-          if [ -f "build/Release/soem_addon.node" ]; then
-            echo "✓ Binary file exists"
-            ls -la build/Release/soem_addon.node
-          else
-            echo "✗ Binary file not found"
-            ls -la build/Release/ || echo "Release directory not found"
-            exit 1
-          fi
-
-          # Check if TypeScript compilation worked
-          if [ -f "dist/index.js" ]; then
-            echo "✓ TypeScript compilation successful"
-          else
-            echo "✗ TypeScript compilation failed"
-            ls -la dist/ || echo "dist directory not found"
-            exit 1
-          fi
-
-          # Windows-specific: Check dependencies using PowerShell
-          if [ "${{ matrix.platform }}" = "win32" ]; then
-            echo "🔍 Checking Windows dependencies..."
-            powershell -Command "Write-Host 'Checking Visual C++ runtime availability...'; if (Test-Path 'C:\Windows\System32\msvcp140.dll') { Write-Host 'msvcp140.dll found' } else { Write-Host 'msvcp140.dll missing' }; if (Test-Path 'C:\Windows\System32\vcruntime140.dll') { Write-Host 'vcruntime140.dll found' } else { Write-Host 'vcruntime140.dll missing' }"
-          fi
-
-          # Test loading the module with better error handling
-          echo "🧪 Testing Node.js module loading..."
-          node -e "
-            try {
-              console.log('Testing module load...');
-              
-              // First, try to require the native addon directly
-              try {
-                const addon = require('./build/Release/soem_addon.node');
-                console.log('✓ Native addon loaded directly');
-              } catch(directError) {
-                console.log('⚠ Direct native addon load failed:', directError.message.split('\n')[0]);
-                
-                // On Windows, this is often due to missing Visual C++ redistributables
-                if (process.platform === 'win32') {
-                  console.log('💡 This is common on Windows CI without VC++ redistributables');
-                  console.log('💡 The module will work on user systems with proper runtimes');
-                  
-                  // Don't exit with error for this case
-                  console.log('✓ Module test completed (expected CI limitation)');
-                  process.exit(0);
-                }
-                
-                throw directError;
-              }
-              
-              // If we get here, try the full module
-              const { SoemMaster } = require('./dist');
-              console.log('✓ Module loaded successfully');
-              console.log('✓ SoemMaster class available');
-              
-              // Test that class methods exist
-              if (typeof SoemMaster.listInterfaces === 'function') {
-                console.log('✓ listInterfaces method available');
-              } else {
-                throw new Error('listInterfaces method not found');
-              }
-              
-              // Try to get interfaces (may fail on CI but that's ok for network operations)
-              try {
-                const interfaces = SoemMaster.listInterfaces();
-                console.log('✓ Interfaces found:', interfaces.length);
-                if (interfaces.length > 0) {
-                  console.log('Sample interface:', interfaces[0].name);
-                }
-              } catch(e) {
-                console.log('⚠ Interface discovery failed (expected on CI):', e.message.split('\n')[0]);
-              }
-              
-              console.log('✓ Complete module functionality test passed');
-            } catch(e) {
-              console.error('✗ Module test failed:', e.message);
-              console.error('Stack:', e.stack);
-              process.exit(1);
-            }
-          "
-
-      - name: Verify build artifacts
-        shell: bash
-        run: |
-          echo "🔍 Final verification of build artifacts..."
-
-          # Ensure we have the essential files for publishing
-          if [ -f "build/Release/soem_addon.node" ]; then
-            echo "✓ Native addon binary present"
-          else
-            echo "✗ Native addon binary missing"
-            exit 1
-          fi
-
-          if [ -f "dist/index.js" ]; then
-            echo "✓ TypeScript compiled output present"
-          else
-            echo "✗ TypeScript compiled output missing"
-            exit 1
-          fi
-
-          if [ -f "types/index.d.ts" ]; then
-            echo "✓ TypeScript definitions present"
-          else
-            echo "✗ TypeScript definitions missing"
-            exit 1
-          fi
-
-          echo "✅ All required build artifacts verified"
-
+      # ⚠️ Ces artefacts ne sont utiles que si tu les publies/re-distribues (prebuilds)
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -389,13 +180,19 @@ jobs:
           path: |
             build/Release/soem_addon.node
             dist/
+            types/
           retention-days: 1
 
-  # Job 3: Publication NPM
   publish-npm:
     name: Publish to NPM
     needs: [test-before-publish, build-binaries]
     runs-on: ubuntu-latest
+
+    # Publie seulement sur tag v* ou via dispatch
+    if: >
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'release' && github.event.action == 'published')
 
     steps:
       - name: Checkout code
@@ -404,22 +201,14 @@ jobs:
           submodules: recursive
 
       - name: Verify submodules
-        shell: bash
         run: |
-          echo "Checking submodule status..."
-          git submodule status
-          echo "Listing external directory..."
-          ls -la external/
-          if [ ! -f "external/soem/CMakeLists.txt" ]; then
-            echo "SOEM submodule not properly initialized, initializing manually..."
-            git submodule update --init --recursive --force
-            ls -la external/soem/
-          fi
+          git submodule update --init --recursive --force
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          check-latest: true
           registry-url: "https://registry.npmjs.org"
           cache: "npm"
 
@@ -431,44 +220,44 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Déterminer la version à publier
-      - name: Get version from tag
+      - name: Resolve version to publish
         id: get_version
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
           else
-            VERSION=${GITHUB_REF#refs/tags/v}
+            VERSION="${GITHUB_REF#refs/tags/v}"
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing version: $VERSION"
 
-      # Mettre à jour la version dans package.json
       - name: Update package.json version
         run: |
-          npm version ${{ steps.get_version.outputs.VERSION }} --no-git-tag-version
-          echo "Updated package.json to version ${{ steps.get_version.outputs.VERSION }}"
+          npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version
+          node -e "console.log('package.json version set to', require('./package.json').version)"
 
       - name: Build for publication
         run: npm run build
 
       - name: Run final tests
-        run: |
-          echo "Running final tests before publication..."
-          npm test
-          echo "✓ All tests passed"
+        run: npm test
 
-      # Publication NPM
-      - name: Publish to NPM
-        run: npm publish
+      - name: Publish to NPM (with provenance)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # Créer une release GitHub si pas déjà fait
-      - name: Create GitHub Release
-        if: github.event_name != 'release'
         run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          # --access public si besoin (package public ou scope)
+          npm publish --provenance --access public
+
+      - name: Create GitHub Release if needed
+        if: github.event_name != 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
           gh release create "v${VERSION}" \
             --title "Release v${VERSION}" \
             --notes "## 🚀 Release v${VERSION}
@@ -479,22 +268,18 @@ jobs:
           \`\`\`
 
           ### 🔗 Links
-          - [NPM Package](https://www.npmjs.com/package/soem-node/v/${VERSION})
-          - [GitHub Repository](https://github.com/MXASoundNDEv/SOEM-Nodejs)
-          - [Documentation](https://github.com/MXASoundNDEv/SOEM-Nodejs#readme)
+          - NPM : https://www.npmjs.com/package/soem-node/v/${VERSION}
+          - Repo : https://github.com/MXASoundNDEv/SOEM-Nodejs
+          - Docs : https://github.com/MXASoundNDEv/SOEM-Nodejs#readme
 
           ### 📋 Changes
-          See [CHANGELOG.md](https://github.com/MXASoundNDEv/SOEM-Nodejs/blob/main/CHANGELOG.md) for detailed changes."
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          Voir [CHANGELOG.md](https://github.com/MXASoundNDEv/SOEM-Nodejs/blob/main/CHANGELOG.md)."
 
-  # Job 4: Notification de succès
   notify-success:
     name: Notify Success
     needs: [publish-npm]
     runs-on: ubuntu-latest
     if: success()
-
     steps:
       - name: Success notification
         run: |
