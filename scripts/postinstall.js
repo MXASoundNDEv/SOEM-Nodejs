@@ -2,6 +2,7 @@
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 
 console.log('[soem-node] Post-install setup...');
 
@@ -9,52 +10,127 @@ console.log('[soem-node] Post-install setup...');
 const soemPath = path.join(__dirname, '..', 'external', 'soem');
 const soemCMake = path.join(soemPath, 'CMakeLists.txt');
 
+// If the native addon is already present (packaged), skip heavy work
+const packagedBinary = path.join(__dirname, '..', 'build', 'Release', 'soem_addon.node');
+if (fs.existsSync(packagedBinary)) {
+  console.log('[soem-node] Native addon already present, skipping postinstall build.');
+  console.log('[soem-node] Binary path:', packagedBinary);
+  process.exit(0);
+}
+
 // Ensure external directory exists before any git operations
 fs.mkdirSync(path.join(__dirname, '..', 'external'), { recursive: true });
 
 if (!fs.existsSync(soemCMake)) {
   console.log('[soem-node] SOEM submodule not found, initializing...');
 
-  // Try to initialize submodule with fresh start
-  console.log('[soem-node] Cleaning any existing submodule...');
-  spawnSync('git', ['submodule', 'deinit', '-f', 'external/soem'], {
-    stdio: 'pipe',
-    cwd: path.join(__dirname, '..')
-  });
-
-  // Try to initialize submodule
+  // Try to initialize submodule (non-destructive). Do not deinit or remove package contents.
+  // We run 'git submodule update' if possible, otherwise we clone into a temporary directory and copy files.
   const gitRes = spawnSync('git', ['submodule', 'update', '--init', '--recursive', '--force'], {
     stdio: 'inherit',
     cwd: path.join(__dirname, '..')
   });
 
   if (gitRes.status !== 0) {
-    console.log('[soem-node] Git submodule init failed, cloning SOEM directly...');
+    console.log('[soem-node] Git submodule init failed, cloning SOEM to a temporary directory...');
 
-    // Remove any partial directory
-    if (fs.existsSync(soemPath)) {
-      fs.rmSync(soemPath, { recursive: true, force: true });
+    // Create temp dir and clone there to avoid touching package files directly
+    let tmpDir = null;
+    try {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'soem-'));
+    } catch (e) {
+      tmpDir = path.join(os.tmpdir(), 'soem-clone');
+      try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (__) { /* ignore */ }
     }
 
-    // Fallback: clone SOEM directly
     const cloneRes = spawnSync('git', [
       'clone',
       '--depth=1',
       '--branch=master',
       'https://github.com/OpenEtherCATsociety/SOEM.git',
-      soemPath
+      tmpDir
     ], { stdio: 'inherit' });
 
     if (cloneRes.status !== 0) {
-      console.error('[soem-node] Failed to initialize SOEM dependency');
-      process.exit(1);
+      console.error('[soem-node] Failed to clone SOEM into temporary directory');
+      try {
+        const dbg = [
+          '[soem-node] Failed to clone SOEM',
+          'clone exit code: ' + cloneRes.status,
+          'clone error: ' + (cloneRes.error ? cloneRes.error.message : 'none')
+        ].join('\n');
+        fs.writeFileSync(path.join(__dirname, '..', 'BUILD-FAILED.txt'), dbg, { encoding: 'utf8' });
+        console.error('[soem-node] Wrote BUILD-FAILED.txt with debug info. You can initialize the dependency manually.');
+      } catch (e) {
+        console.error('[soem-node] Could not write BUILD-FAILED.txt:', e && e.message);
+      }
+      process.exit(0);
+    }
+
+    // Copy from tmpDir to soemPath only if target does not already exist, or if missing files
+    try {
+      // Ensure external directory exists
+      fs.mkdirSync(path.dirname(soemPath), { recursive: true });
+      // If target doesn't exist, move the clone into place; otherwise copy missing files
+      if (!fs.existsSync(soemPath) || fs.readdirSync(soemPath).length === 0) {
+        fs.mkdirSync(soemPath, { recursive: true });
+        // move by renaming when possible
+        try {
+          fs.renameSync(tmpDir, soemPath);
+          tmpDir = null; // renamed, no need to delete
+        } catch (e) {
+          // fallback to copy
+        }
+      }
+
+      // recursive copy helper
+      const copyRecursive = (src, dest) => {
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        fs.mkdirSync(dest, { recursive: true });
+        for (const ent of entries) {
+          const s = path.join(src, ent.name);
+          const d = path.join(dest, ent.name);
+          if (ent.isDirectory()) {
+            copyRecursive(s, d);
+          } else if (ent.isSymbolicLink()) {
+            try {
+              const link = fs.readlinkSync(s);
+              try { fs.symlinkSync(link, d); } catch (_) { /* ignore */ }
+            } catch (_) { /* ignore */ }
+          } else {
+            try { fs.copyFileSync(s, d); } catch (_) { /* ignore */ }
+          }
+        }
+      };
+
+      if (tmpDir) {
+        copyRecursive(tmpDir, soemPath);
+      }
+
+    } catch (e) {
+      console.error('[soem-node] Error copying SOEM into package:', e && e.message);
+      try {
+        fs.writeFileSync(path.join(__dirname, '..', 'BUILD-FAILED.txt'), '[soem-node] Error copying SOEM into package: ' + (e && e.message), { encoding: 'utf8' });
+      } catch (_) { /* ignore */ }
+      // continue without failing install
+    } finally {
+      // cleanup tmpDir if present
+      if (tmpDir && fs.existsSync(tmpDir)) {
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+      }
     }
   }
 
   // Verify SOEM is now available
   if (!fs.existsSync(soemCMake)) {
     console.error('[soem-node] SOEM initialization failed - CMakeLists.txt not found');
-    process.exit(1);
+    try {
+      fs.writeFileSync(path.join(__dirname, '..', 'BUILD-FAILED.txt'), '[soem-node] SOEM initialization failed - CMakeLists.txt not found', { encoding: 'utf8' });
+      console.error('[soem-node] Wrote BUILD-FAILED.txt with debug info.');
+    } catch (e) {
+      console.error('[soem-node] Could not write BUILD-FAILED.txt:', e && e.message);
+    }
+    process.exit(0);
   }
 
   console.log('[soem-node] SOEM successfully initialized');
@@ -87,20 +163,32 @@ if (res.status !== 0) {
   console.error('You can set DEBUG=cmake-js:* for verbose logs.');
 
   // Additional debug information
-  console.error('\n[soem-node] Debug information:');
-  console.error('- Platform:', process.platform);
-  console.error('- Node version:', process.version);
-  console.error('- Working directory:', process.cwd());
-  console.error('- SOEM path exists:', fs.existsSync(soemPath));
-  console.error('- CMakeLists.txt exists:', fs.existsSync(soemCMake));
-  console.error('- Exit code:', res.status);
-  console.error('- Signal:', res.signal);
+  const debugLines = [
+    '[soem-node] Debug information:',
+    '- Platform: ' + process.platform,
+    '- Node version: ' + process.version,
+    '- Working directory: ' + process.cwd(),
+    '- SOEM path exists: ' + fs.existsSync(soemPath),
+    '- CMakeLists.txt exists: ' + fs.existsSync(soemCMake),
+    '- Exit code: ' + res.status,
+    '- Signal: ' + res.signal,
+  ];
   if (res.error) {
-    console.error('- Error:', res.error.message);
-    console.error('- Error code:', res.error.code);
+    debugLines.push('- Error: ' + res.error.message);
+    debugLines.push('- Error code: ' + res.error.code);
+  }
+  debugLines.push('\n[soem-node] Installation did not complete native build. You can run `npm run build` in the package root or follow the README for manual build steps.');
+
+  debugLines.forEach(l => console.error(l));
+  try {
+    fs.writeFileSync(path.join(__dirname, '..', 'BUILD-FAILED.txt'), debugLines.join('\n'), { encoding: 'utf8' });
+    console.error('[soem-node] Wrote BUILD-FAILED.txt with debug info.');
+  } catch (e) {
+    console.error('[soem-node] Could not write BUILD-FAILED.txt:', e && e.message);
   }
 
-  process.exit(res.status || 1);
+  // Do not fail the whole npm install; allow consumer to decide next steps.
+  process.exit(0);
 }
 
 console.log('[soem-node] Build completed successfully!');
