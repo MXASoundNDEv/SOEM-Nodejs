@@ -293,41 +293,7 @@ jobs:
           # Windows-specific: Check dependencies using PowerShell
           if [ "${{ matrix.platform }}" = "win32" ]; then
             echo "🔍 Checking Windows dependencies..."
-            powershell -Command "
-              Write-Host 'Checking DLL dependencies...'
-              
-              # Check if the binary can be loaded by Windows
-              try {
-                Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Kernel32 { [DllImport(\"kernel32.dll\")] public static extern IntPtr LoadLibrary(string lpFileName); }'
-                \$handle = [Kernel32]::LoadLibrary('$PWD/build/Release/soem_addon.node')
-                if (\$handle -ne [IntPtr]::Zero) {
-                  Write-Host '✓ Binary can be loaded by Windows'
-                } else {
-                  Write-Host '⚠ Binary cannot be loaded by Windows - checking dependencies'
-                  
-                  # Try to find missing dependencies
-                  if (Get-Command 'dumpbin.exe' -ErrorAction SilentlyContinue) {
-                    Write-Host 'Checking dependencies with dumpbin:'
-                    & dumpbin.exe /dependents '$PWD/build/Release/soem_addon.node'
-                  } else {
-                    Write-Host 'dumpbin not available for dependency analysis'
-                  }
-                }
-              } catch {
-                Write-Host '⚠ Could not check binary loading: \$(\$_.Exception.Message)'
-              }
-              
-              # Check for common missing DLLs
-              Write-Host 'Checking for common runtime libraries...'
-              \$commonDlls = @('msvcp140.dll', 'vcruntime140.dll', 'api-ms-win-crt-runtime-l1-1-0.dll')
-              foreach (\$dll in \$commonDlls) {
-                if (Get-Command \$dll -ErrorAction SilentlyContinue) {
-                  Write-Host \"✓ \$dll found\"
-                } else {
-                  Write-Host \"⚠ \$dll not found in PATH\"
-                }
-              }
-            "
+            powershell -Command "Write-Host 'Checking Visual C++ runtime availability...'; if (Test-Path 'C:\Windows\System32\msvcp140.dll') { Write-Host 'msvcp140.dll found' } else { Write-Host 'msvcp140.dll missing' }; if (Test-Path 'C:\Windows\System32\vcruntime140.dll') { Write-Host 'vcruntime140.dll found' } else { Write-Host 'vcruntime140.dll missing' }"
           fi
 
           # Test loading the module with better error handling
