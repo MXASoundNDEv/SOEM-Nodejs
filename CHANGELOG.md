@@ -94,3 +94,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: https://github.com/MXASoundNDEv/SOEM-Nodejs/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/MXASoundNDEv/SOEM-Nodejs/releases/tag/v0.1.0
+
+## [Unreleased]
+
+### Added
+ - Optionnel `ca` (Complete Access) parameter for `sdoRead` and `sdoWrite` to support Complete Access SDO transfers when required by a slave.
+ - Nouveaux wrappers / méthodes exposés côté JS :
+   - `writeState(slave, state)` — écrire un état demandé sur un esclave.
+   - `stateCheck(slave, reqstate, timeout?)` — attendre qu'un esclave atteigne un état.
+   - `reconfigSlave(slave, timeout?)` — reconfigurer un esclave.
+   - `recoverSlave(slave, timeout?)` — tenter la récupération d'un esclave en erreur.
+   - `slaveMbxCyclic(slave)` — activer la mailbox cyclique.
+   - `configDC()` — configurer Distributed Clocks.
+   - `getSlaves()` — lister les esclaves et métadonnées.
+   - `initRedundant(if1, if2)` — initialiser un master redondant.
+   - `configMapGroup(group?)`, `sendProcessdataGroup(group?)`, `receiveProcessdataGroup(group?, timeout?)` — API pour groupes processdata.
+   - `mbxHandler(group?, limit?)` — gestionnaire mailbox.
+   - `elist2string()` — obtenir une représentation textuelle des erreurs SOEM.
+   - `SoEread` / `SoEwrite` — SoE services pour drives compatibles.
+   - `readeeprom` / `writeeeprom` — accès EEPROM bas-niveau.
+   - `APRD` / `APWR` / `LRW` / `LRD` / `LWR` — primitives bas-niveau d'accès au port.
+   - `dcsync0` / `dcsync01` — helpers de configuration DC (single/dual cycle).
+
+### Fixed
+- Corrected native wrapper calls for port-centred primitives to pass `&ctx_.port` instead of the whole context, resolving a compile-time type mismatch on Windows/MSVC builds.
+ - Continuous Integration now runs integration tests in stub mode (RUN_INTEGRATION_STUB) to validate JS/native API without hardware.

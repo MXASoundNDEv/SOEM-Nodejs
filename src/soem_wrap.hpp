@@ -42,6 +42,38 @@ namespace soemnode
         Napi::Value sendProcessdata(const Napi::CallbackInfo &info);
         Napi::Value receiveProcessdata(const Napi::CallbackInfo &info);
         Napi::Value close(const Napi::CallbackInfo &info);
+        Napi::Value writeState(const Napi::CallbackInfo &info);
+        Napi::Value stateCheck(const Napi::CallbackInfo &info);
+        Napi::Value reconfigSlave(const Napi::CallbackInfo &info);
+        Napi::Value recoverSlave(const Napi::CallbackInfo &info);
+        Napi::Value slaveMbxCyclic(const Napi::CallbackInfo &info);
+        Napi::Value configDC(const Napi::CallbackInfo &info);
+        Napi::Value getSlaves(const Napi::CallbackInfo &info);
+        Napi::Value initRedundant(const Napi::CallbackInfo &info);
+        Napi::Value configMapGroup(const Napi::CallbackInfo &info);
+        Napi::Value sendProcessdataGroup(const Napi::CallbackInfo &info);
+        Napi::Value receiveProcessdataGroup(const Napi::CallbackInfo &info);
+        Napi::Value mbxHandler(const Napi::CallbackInfo &info);
+        Napi::Value elist2string(const Napi::CallbackInfo &info);
+
+        // SoE / EoE / FoE
+        Napi::Value SoEread(const Napi::CallbackInfo &info);
+        Napi::Value SoEwrite(const Napi::CallbackInfo &info);
+
+        // EEPROM helpers
+        Napi::Value readeeprom(const Napi::CallbackInfo &info);
+        Napi::Value writeeeprom(const Napi::CallbackInfo &info);
+
+        // Low-level primitives (APRD / APWR / LRW / LRD / LWR)
+        Napi::Value APRD(const Napi::CallbackInfo &info);
+        Napi::Value APWR(const Napi::CallbackInfo &info);
+        Napi::Value LRW(const Napi::CallbackInfo &info);
+        Napi::Value LRD(const Napi::CallbackInfo &info);
+        Napi::Value LWR(const Napi::CallbackInfo &info);
+
+        // Distributed clock helpers
+        Napi::Value dcsync0(const Napi::CallbackInfo &info);
+        Napi::Value dcsync01(const Napi::CallbackInfo &info);
 
         std::string ifname_ = "eth0";
         bool opened_ = false;
