@@ -235,9 +235,21 @@ jobs:
           echo "Publishing version: $VERSION"
 
       - name: Update package.json version
+        id: set_version
         run: |
-          npm version ${{ steps.get_version.outputs.version }} --no-git-tag-version
-          node -e "console.log('package.json version set to', require('./package.json').version)"
+          VERSION="${{ steps.get_version.outputs.version }}"
+          echo "Setting package.json version to $VERSION"
+          node -e "const fs=require('fs');const v=process.env.VERSION;const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=v;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('package.json version set to',p.version)"
+      - name: Verify package.json version changed
+        run: |
+          NEW=$(node -e "console.log(require('./package.json').version)")
+          echo "package.json version is $NEW"
+          if [ "$NEW" = "${{ steps.get_version.outputs.version }}" ]; then
+            echo "Version correctly set"
+          else
+            echo "Version mismatch: expected ${{ steps.get_version.outputs.version }}, got $NEW"
+            exit 1
+          fi
 
       - name: Build for publication
         run: npm run build
