@@ -9,6 +9,9 @@ console.log('[soem-node] Post-install setup...');
 const soemPath = path.join(__dirname, '..', 'external', 'soem');
 const soemCMake = path.join(soemPath, 'CMakeLists.txt');
 
+// Ensure external directory exists before any git operations
+fs.mkdirSync(path.join(__dirname, '..', 'external'), { recursive: true });
+
 if (!fs.existsSync(soemCMake)) {
   console.log('[soem-node] SOEM submodule not found, initializing...');
 
