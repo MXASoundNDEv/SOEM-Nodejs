@@ -84,5 +84,14 @@
     "discovery"
   ],
   "author": "MXA.K",
-  "license": "GPL-2.0-or-later"
+  "license": "GPL-2.0-or-later",
+  "files": [
+    "dist/",
+    "build/Release/soem_addon.node",
+    "types/",
+    "scripts/",
+    "examples/",
+    "README.md",
+    "CHANGELOG.md"
+  ]
 }
