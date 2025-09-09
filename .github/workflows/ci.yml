@@ -172,10 +172,11 @@ jobs:
           ls -la dist/index.js || echo "No compiled index.js found"
 
       - name: Run integration tests (stub)
+        env:
+          RUN_INTEGRATION_STUB: "true"
         run: |
           echo "Running integration tests in stub mode (no hardware)"
-          export RUN_INTEGRATION_STUB=true
-          npx jest test/integration/soem.integration.test.ts --runInBand --silent || (echo "Integration stub tests failed" && exit 1)
+          npx jest test/integration/soem.integration.test.ts --runInBand --silent
 
       - name: Upload build artifacts
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
