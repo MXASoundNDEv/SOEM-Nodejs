@@ -10,12 +10,28 @@ console.log('[soem-node] Post-install setup...');
 const soemPath = path.join(__dirname, '..', 'external', 'soem');
 const soemCMake = path.join(soemPath, 'CMakeLists.txt');
 
-// If the native addon is already present (packaged), skip heavy work
+// If the native addon is already present (packaged), try to load it.
+// If it loads, skip heavy work. If it fails to load (ABI/arch mismatch), attempt a rebuild.
 const packagedBinary = path.join(__dirname, '..', 'build', 'Release', 'soem_addon.node');
+const skipBuildEnv = process.env.SOEM_SKIP_BUILD === '1' || process.env.SOEM_SKIP_BUILD === 'true';
 if (fs.existsSync(packagedBinary)) {
-  console.log('[soem-node] Native addon already present, skipping postinstall build.');
-  console.log('[soem-node] Binary path:', packagedBinary);
-  process.exit(0);
+  let canUseBinary = false;
+  try {
+    // Try to load the binary directly to validate ABI/arch compatibility
+    require(packagedBinary);
+    canUseBinary = true;
+  } catch (e) {
+    console.warn('[soem-node] Existing binary found but failed to load, will attempt rebuild.');
+    console.warn('[soem-node] Error:', e && e.message);
+  }
+  if (canUseBinary) {
+    console.log('[soem-node] Native addon already present and loadable, skipping postinstall build.');
+    console.log('[soem-node] Binary path:', packagedBinary);
+    process.exit(0);
+  } else if (skipBuildEnv) {
+    console.warn('[soem-node] Build skipped due to SOEM_SKIP_BUILD env var; the addon may not work until rebuilt.');
+    process.exit(0);
+  }
 }
 
 // Ensure external directory exists before any git operations
