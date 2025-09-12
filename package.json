@@ -91,6 +91,11 @@
     "types/",
     "scripts/",
     "examples/",
+    "src",
+    "include",
+    "external",
+    "CMakeLists.txt",
+    "LICENSE",
     "README.md",
     "CHANGELOG.md"
   ]
