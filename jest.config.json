@@ -17,6 +17,7 @@
   "testTimeout": 30000,
   "setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
   "moduleNameMapper": {
-    "^../build/Release/soem_addon\\.node$": "<rootDir>/test/__mocks__/soem_addon.js"
+    "^../build/Release/soem_addon\\.node$": "<rootDir>/test/__mocks__/soem_addon.js",
+    "^bindings$": "<rootDir>/test/__mocks__/bindings.js"
   }
 }
