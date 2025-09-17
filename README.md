@@ -123,6 +123,51 @@ main().catch(console.error);
 npm run build
 ```
 
+## Utilisation avec Electron
+
+Cette librairie utilise Node-API (N-API), ce qui garantit une compatibilité binaire stable entre Node.js et Electron tant que la version de N-API supportée est identique. Toutefois, sur certains environnements, il peut être nécessaire de reconstruire le module natif contre les en-têtes d'Electron.
+
+1) Rebuild ciblé Electron (recommandé si nécessaire)
+
+```bash
+# via script utilitaire (Windows PowerShell)
+npm run rebuild:electron -- 30.0.0
+
+# ou à l'installation
+npm install --runtime=electron --target=30.0.0
+```
+
+Le script `rebuild:electron` appelle `cmake-js rebuild --runtime=electron --runtimeVersion=<version>`. Pendant `npm install`, si vous passez `--runtime=electron --target=<version>`, le script `postinstall` détecte Electron et reconstruit automatiquement.
+
+2) Chargement du binaire dans Electron
+
+- Le chargement utilise le paquet `bindings` pour localiser `soem_addon.node`, compatible avec les bundles Electron et `asarUnpack`.
+- Si vous empaquetez votre app avec ASAR, placez le binaire natif dans une section non-emballée. Par exemple avec `electron-builder`:
+
+```jsonc
+{
+  "asarUnpack": [
+    "node_modules/soem-node/build/Release/*.node"
+  ]
+}
+```
+
+Avec `electron-packager`, utilisez l’option équivalente pour exclure les `.node` du paquet ASAR ou les copier dans `resources/app.asar.unpacked`.
+
+3) Prérequis système dans Electron
+
+- Windows: Npcap/WinPcap doit être installé pour l’accès réseau bas niveau.
+- Linux: `libpcap` et les capacités réseau (voir plus haut la section permissions).
+
+4) Dépannage spécifique Electron
+
+- Erreur de chargement du module natif: lancez `npm run rebuild:electron -- <version>` et relancez l’app.
+- Architecture/ABI: assurez-vous que l’architecture (x64/arm64) de votre app Electron correspond à celle du module natif.
+- CMake/Toolchain: Electron nécessite une toolchain C/C++ opérationnelle (MSVC sous Windows, gcc/clang sous Linux).
+
+Référence: Documentation Electron – Native code & Electron
+https://www.electronjs.org/docs/latest/tutorial/native-code-and-electron
+
 ## 🧪 Tests et Qualité
 
 ### Exécution des tests

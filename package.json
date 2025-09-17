@@ -9,6 +9,7 @@
     "clean": "rimraf dist build node_modules/.cache",
     "install": "node scripts/postinstall.js",
     "prepare": "npm run build",
+    "rebuild:electron": "node scripts/rebuild-electron.js",
     "test": "jest test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
     "test:watch": "jest --watch test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
     "test:coverage": "jest --coverage test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
@@ -50,6 +51,7 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
+    "bindings": "^1.5.0",
     "node-addon-api": "^8.0.0"
   },
   "os": [

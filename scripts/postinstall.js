@@ -154,21 +154,30 @@ if (!fs.existsSync(soemCMake)) {
 
 console.log('[soem-node] Building native addon with cmake-js...');
 
+// Détection Electron: npm_config_runtime = 'electron' et/ou npm_config_target = version
+const npmRuntime = process.env.npm_config_runtime || '';
+const npmTarget = process.env.npm_config_target || '';
+const isElectron = npmRuntime.toLowerCase() === 'electron' || !!process.versions.electron;
+
 // Try different approaches for running cmake-js
 let res;
+const commonArgs = [];
+if (isElectron) {
+  commonArgs.push('--runtime=electron');
+  if (npmTarget) commonArgs.push(`--runtimeVersion=${npmTarget}`);
+}
 if (process.platform === 'win32') {
   // On Windows, use the .cmd file directly
-  res = spawnSync(path.join(__dirname, '..', 'node_modules', '.bin', 'cmake-js.cmd'), [
-    'rebuild',
-    '--loglevel=verbose'
-  ], {
+  const args = ['rebuild', '--loglevel=verbose', ...commonArgs];
+  res = spawnSync(path.join(__dirname, '..', 'node_modules', '.bin', 'cmake-js.cmd'), args, {
     stdio: 'inherit',
     encoding: 'utf8',
     shell: true
   });
 } else {
   // On Unix-like systems, use npx directly
-  res = spawnSync('npx', ['cmake-js', 'rebuild', '--loglevel=verbose'], {
+  const args = ['cmake-js', 'rebuild', '--loglevel=verbose', ...commonArgs];
+  res = spawnSync('npx', args, {
     stdio: 'inherit',
     encoding: 'utf8'
   });

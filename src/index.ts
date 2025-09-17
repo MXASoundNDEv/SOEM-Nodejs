@@ -1,4 +1,18 @@
-const native: any = require('../build/Release/soem_addon.node');
+// Utilise 'bindings' pour résoudre le chemin du binaire natif de façon robuste
+// (compatible avec Electron, asarUnpack, et différentes dispositions de build)
+// Voir: https://www.electronjs.org/docs/latest/tutorial/native-code-and-electron
+// et https://github.com/TooTallNate/node-bindings
+// NB: le nom doit correspondre à OUTPUT_NAME de la cible CMake (soem_addon)
+// ainsi qu'au nom du module exporté via NODE_API_MODULE.
+// Fallback vers le chemin direct si nécessaire (en dev rare)
+let native: any;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  native = require('bindings')('soem_addon');
+} catch (e) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  native = require('../build/Release/soem_addon.node');
+}
 
 /**
  * Représentation d'une interface réseau retournée par `SoemMaster.listInterfaces()`.
