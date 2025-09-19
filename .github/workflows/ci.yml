@@ -152,6 +152,12 @@ jobs:
       - name: Build native addon
         run: npx cmake-js rebuild --loglevel=info
 
+      - name: Build for Electron
+        run: |
+          echo "Rebuilding native addon for Electron targets..."
+          npm run rebuild:electron
+          echo "Electron rebuild finished"
+
       - name: Compile TypeScript
         run: npx tsc
 

@@ -44,7 +44,7 @@ jobs:
       - name: Commit package.json and create tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
         env:
-          VERSION: ${{ steps.get_version.outputs.version }}
+          VERSION: ${{ github.event.inputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CURRENT_BRANCH="${GITHUB_REF_NAME:-$(git symbolic-ref --short HEAD || echo main)}"
@@ -300,6 +300,11 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(release): v$VERSION"
+            # Pull latest changes and rebase to avoid push rejection
+            echo "Pulling latest changes from origin/main before push"
+            git fetch origin main
+            git pull --rebase origin main || (echo "Rebase failed - aborting and showing git status"; git rebase --abort || true; git status --porcelain; exit 1)
+
             # Push the commit to the current branch
             git push origin HEAD
           fi
@@ -322,9 +327,31 @@ jobs:
       - name: Publish to NPM (with provenance)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_OTP: ${{ secrets.NPM_OTP }}
         run: |
           # --access public si besoin (package public ou scope)
-          npm publish --provenance --access public
+          set -e
+          echo "Publishing to NPM..."
+          if npm publish --provenance --access public; then
+            echo "npm publish succeeded"
+          else
+            echo "npm publish failed. Checking for OTP (2FA) issue..."
+            # If 2FA is enabled, npm returns EOTP and the action cannot prompt for it.
+            # Option A (recommended): create an npm automation token and set it as NPM_TOKEN.
+            # Option B: provide a one-time password in the secret NPM_OTP and we'll retry.
+            if echo "${{ toJson(github) }}" | grep -q ""; then :; fi
+            if [ -n "$NPM_OTP" ]; then
+              echo "Retrying publish with provided NPM_OTP secret..."
+              npm publish --provenance --access public --otp="$NPM_OTP" || {
+                echo "Retry with OTP failed. Please check the OTP or create an automation token for CI."; exit 1;
+              }
+            else
+              echo "No NPM_OTP secret found. To publish from CI when 2FA is enabled either:"
+              echo " - Create an npm automation token and set it in the repository secret NPM_TOKEN (recommended), or"
+              echo " - Add a one-time password to the secret NPM_OTP and re-run the workflow (less secure / short-lived)."
+              exit 1
+            fi
+          fi
 
       - name: Create GitHub Release if needed
         if: github.event_name != 'release'
