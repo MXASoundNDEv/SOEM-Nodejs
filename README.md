@@ -137,9 +137,9 @@ npm run rebuild:electron -- 30.0.0
 npm install --runtime=electron --target=30.0.0
 ```
 
-Le script `rebuild:electron` appelle `cmake-js rebuild --runtime=electron --runtimeVersion=<version>`. Pendant `npm install`, si vous passez `--runtime=electron --target=<version>`, le script `postinstall` détecte Electron et reconstruit automatiquement.
+Le script `rebuild:electron` appelle `node-gyp configure --verbose --runtime=electron --target=<version> --dist-url=https://electronjs.org/headers` suivi de `node-gyp build` avec les mêmes paramètres. Pendant `npm install`, si vous passez `--runtime=electron --target=<version>`, le script `postinstall` détecte Electron et reconstruit automatiquement avec `node-gyp`.
 
-En cas d'échec, `npm run rebuild:electron` renvoie désormais un code de sortie non nul et affiche les erreurs de `cmake-js` pour faciliter le diagnostic. Sur les systèmes POSIX où `npx` est indisponible, le script bascule automatiquement sur le binaire `cmake-js` local installé avec le projet.
+En cas d'échec, `npm run rebuild:electron` renvoie un code de sortie non nul et affiche les erreurs de `node-gyp` pour faciliter le diagnostic. Sur les systèmes POSIX où `npx` est indisponible, le script bascule automatiquement sur le binaire `node-gyp` local installé avec le projet.
 
 2) Chargement du binaire dans Electron
 
@@ -165,7 +165,7 @@ Avec `electron-packager`, utilisez l’option équivalente pour exclure les `.no
 
 - Erreur de chargement du module natif: lancez `npm run rebuild:electron -- <version>` et relancez l’app.
 - Architecture/ABI: assurez-vous que l’architecture (x64/arm64) de votre app Electron correspond à celle du module natif.
-- CMake/Toolchain: Electron nécessite une toolchain C/C++ opérationnelle (MSVC sous Windows, gcc/clang sous Linux).
+- Toolchain: Electron nécessite une toolchain C/C++ opérationnelle (MSVC sous Windows, gcc/clang + Python sous Linux).
 
 Référence: Documentation Electron – Native code & Electron
 https://www.electronjs.org/docs/latest/tutorial/native-code-and-electron
@@ -255,8 +255,8 @@ Ce script détecte les esclaves, échange les `processdata` et lit l'SDO `0x1000
 ## Dépannage
 
 - Vérifiez que le sous-module SOEM est initialisé.
-- Assurez-vous que votre toolchain C/C++ et CMake sont installés.
-- Utilisez `DEBUG=cmake-js:*` pour des traces détaillées.
+- Assurez-vous que votre toolchain C/C++ (et Python pour node-gyp) est installée.
+- Utilisez `npm_config_node_gyp=node-gyp` et l'option `--verbose` pour des traces détaillées de `node-gyp`.
 
 ## Licence
 

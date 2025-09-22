@@ -152,55 +152,88 @@ if (!fs.existsSync(soemCMake)) {
   console.log('[soem-node] SOEM successfully initialized');
 }
 
-console.log('[soem-node] Building native addon with cmake-js...');
+console.log('[soem-node] Building native addon with node-gyp...');
 
 // Détection Electron: npm_config_runtime = 'electron' et/ou npm_config_target = version
 const npmRuntime = process.env.npm_config_runtime || '';
-const npmTarget = process.env.npm_config_target || '';
+const npmTarget = process.env.npm_config_target || process.env.ELECTRON_VERSION || '';
 const isElectron = npmRuntime.toLowerCase() === 'electron' || !!process.versions.electron;
 
-// Try different approaches for running cmake-js
-let res;
-const commonArgs = [];
+const sharedArgs = ['--verbose'];
+const npmArch = process.env.npm_config_arch;
+const npmPlatform = process.env.npm_config_platform;
+if (npmArch) sharedArgs.push(`--arch=${npmArch}`);
+if (npmPlatform) sharedArgs.push(`--platform=${npmPlatform}`);
+
 if (isElectron) {
-  commonArgs.push('--runtime=electron');
-  if (npmTarget) commonArgs.push(`--runtimeVersion=${npmTarget}`);
+  if (npmTarget) {
+    sharedArgs.push(`--target=${npmTarget}`);
+  }
+  sharedArgs.push('--runtime=electron', '--dist-url=https://electronjs.org/headers');
 }
-if (process.platform === 'win32') {
-  // On Windows, use the .cmd file directly
-  const args = ['rebuild', '--loglevel=verbose', ...commonArgs];
-  res = spawnSync(path.join(__dirname, '..', 'node_modules', '.bin', 'cmake-js.cmd'), args, {
+
+const runNodeGyp = (phase, extraArgs = []) => {
+  const args = [phase, ...sharedArgs, ...extraArgs];
+  const isWin = process.platform === 'win32';
+  const localBinary = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    '.bin',
+    isWin ? 'node-gyp.cmd' : 'node-gyp'
+  );
+
+  const spawnOpts = {
     stdio: 'inherit',
     encoding: 'utf8',
-    shell: true
-  });
-} else {
-  // On Unix-like systems, use npx directly
-  const args = ['cmake-js', 'rebuild', '--loglevel=verbose', ...commonArgs];
-  res = spawnSync('npx', args, {
+    shell: isWin
+  };
+
+  let result;
+  if (fs.existsSync(localBinary)) {
+    result = spawnSync(localBinary, args, spawnOpts);
+    if (result.status === 0) {
+      return result;
+    }
+    if (result.error && result.error.code !== 'ENOENT') {
+      return result;
+    }
+  }
+
+  const globalCmd = isWin ? 'node-gyp.cmd' : 'node-gyp';
+  result = spawnSync(globalCmd, args, spawnOpts);
+  if (result.status === 0) {
+    return result;
+  }
+  if (!result.error || result.error.code !== 'ENOENT') {
+    return result;
+  }
+
+  // Fallback to npx if direct binary failed
+  result = spawnSync('npx', ['node-gyp', ...args], {
     stdio: 'inherit',
     encoding: 'utf8'
   });
-}
+  return result;
+};
 
-if (res.status !== 0) {
-  console.error('\n[soem-node] Build failed. Ensure CMake and a C/C++ toolchain are installed.');
-  console.error('You can set DEBUG=cmake-js:* for verbose logs.');
+const handleFailure = (phase, result) => {
+  console.error(`\n[soem-node] node-gyp ${phase} failed. Ensure Python and a C/C++ toolchain are installed.`);
 
-  // Additional debug information
   const debugLines = [
     '[soem-node] Debug information:',
+    `- Phase: ${phase}`,
     '- Platform: ' + process.platform,
     '- Node version: ' + process.version,
     '- Working directory: ' + process.cwd(),
     '- SOEM path exists: ' + fs.existsSync(soemPath),
     '- CMakeLists.txt exists: ' + fs.existsSync(soemCMake),
-    '- Exit code: ' + res.status,
-    '- Signal: ' + res.signal,
+    '- Exit code: ' + result.status,
+    '- Signal: ' + result.signal,
   ];
-  if (res.error) {
-    debugLines.push('- Error: ' + res.error.message);
-    debugLines.push('- Error code: ' + res.error.code);
+  if (result.error) {
+    debugLines.push('- Error: ' + result.error.message);
+    debugLines.push('- Error code: ' + result.error.code);
   }
   debugLines.push('\n[soem-node] Installation did not complete native build. You can run `npm run build` in the package root or follow the README for manual build steps.');
 
@@ -212,8 +245,17 @@ if (res.status !== 0) {
     console.error('[soem-node] Could not write BUILD-FAILED.txt:', e && e.message);
   }
 
-  // Do not fail the whole npm install; allow consumer to decide next steps.
   process.exit(0);
+};
+
+const configureResult = runNodeGyp('configure');
+if (configureResult.status !== 0) {
+  handleFailure('configure', configureResult);
+}
+
+const buildResult = runNodeGyp('build');
+if (buildResult.status !== 0) {
+  handleFailure('build', buildResult);
 }
 
 console.log('[soem-node] Build completed successfully!');
