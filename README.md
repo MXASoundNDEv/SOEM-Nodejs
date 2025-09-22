@@ -139,6 +139,8 @@ npm install --runtime=electron --target=30.0.0
 
 Le script `rebuild:electron` appelle `cmake-js rebuild --runtime=electron --runtimeVersion=<version>`. Pendant `npm install`, si vous passez `--runtime=electron --target=<version>`, le script `postinstall` détecte Electron et reconstruit automatiquement.
 
+En cas d'échec, `npm run rebuild:electron` renvoie désormais un code de sortie non nul et affiche les erreurs de `cmake-js` pour faciliter le diagnostic. Sur les systèmes POSIX où `npx` est indisponible, le script bascule automatiquement sur le binaire `cmake-js` local installé avec le projet.
+
 2) Chargement du binaire dans Electron
 
 - Le chargement utilise le paquet `bindings` pour localiser `soem_addon.node`, compatible avec les bundles Electron et `asarUnpack`.
