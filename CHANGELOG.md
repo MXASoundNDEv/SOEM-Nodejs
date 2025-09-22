@@ -119,3 +119,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Corrected native wrapper calls for port-centred primitives to pass `&ctx_.port` instead of the whole context, resolving a compile-time type mismatch on Windows/MSVC builds.
  - Continuous Integration now runs integration tests in stub mode (RUN_INTEGRATION_STUB) to validate JS/native API without hardware.
+
+### Changed
+- Migration du système de build: suppression de CMake/cmake-js au profit d'un flux `node-gyp` natif (simplification des dépendances build et installation plus rapide).
+- Suppression des scripts `postinstall.js` (initialisation dynamique SOEM + build) et `rebuild-electron.js` (remplacé par usage direct de `npm rebuild --runtime=electron`).
+- Mise à jour du `README.md` : retrait des références à CMake, clarification des prérequis (plus besoin de CMake), simplification section Electron.
+- Activation de `gypfile: true` dans `package.json` et suppression de `CMakeLists.txt`, `cmake-js.json` du dépôt.
+
+### Removed
+- Fichiers et scripts liés à l'ancien pipeline CMake : `CMakeLists.txt`, `cmake-js.json`, `scripts/postinstall.js`, `scripts/rebuild-electron.js`.
+
+### BREAKING CHANGES
+- Les workflows ou scripts externes qui invoquaient directement `cmake-js` ou dépendaient du script `postinstall.js` doivent être adaptés. Utiliser `npm run build` (ou directement `node-gyp configure build`).
+- Pour Electron, utiliser désormais seulement `npm rebuild --runtime=electron --target=<version>` si nécessaire (le script dédié a été retiré).

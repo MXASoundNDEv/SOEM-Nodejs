@@ -7,9 +7,7 @@
   "scripts": {
     "build": "tsc && node-gyp configure build",
     "clean": "rimraf dist build node_modules/.cache",
-    "install": "node scripts/postinstall.js",
     "prepare": "npm run build",
-    "rebuild:electron": "node scripts/rebuild-electron.js",
     "test": "jest test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
     "test:watch": "jest --watch test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
     "test:coverage": "jest --coverage test/basic.test.ts test/soem-master.test.ts test/ethercat-utils-simple.test.ts",
@@ -33,7 +31,7 @@
     "production-check": "powershell -ExecutionPolicy Bypass -File scripts/production-check.ps1",
     "production-check:linux": "bash scripts/production-check.sh"
   },
-  "gypfile": false,
+  "gypfile": true,
   "engines": {
     "node": ">=18"
   },
@@ -96,7 +94,6 @@
     "src",
     "include",
     "external",
-    "CMakeLists.txt",
     "LICENSE",
     "README.md",
     "CHANGELOG.md"
