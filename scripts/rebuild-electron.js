@@ -7,6 +7,7 @@
     ELECTRON_VERSION, npm_config_target
 */
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const version = process.argv[2] || process.env.ELECTRON_VERSION || process.env.npm_config_target;
@@ -19,33 +20,64 @@ if (!version) {
 console.log(`[soem-node] Rebuild pour Electron v${version}...`);
 
 const isWin = process.platform === 'win32';
-const sharedArgs = ['--runtime=electron', `--runtimeVersion=${version}`, '--loglevel=verbose'];
+const sharedArgs = [
+    '--verbose',
+    '--runtime=electron',
+    `--target=${version}`,
+    '--dist-url=https://electronjs.org/headers',
+];
+
+const npmArch = process.env.npm_config_arch;
+const npmPlatform = process.env.npm_config_platform;
+if (npmArch) sharedArgs.push(`--arch=${npmArch}`);
+if (npmPlatform) sharedArgs.push(`--platform=${npmPlatform}`);
+
 const localBinary = path.join(
     __dirname,
     '..',
     'node_modules',
     '.bin',
-    isWin ? 'cmake-js.cmd' : 'cmake-js',
+    isWin ? 'node-gyp.cmd' : 'node-gyp',
 );
 
 const spawnOptions = {
-    stdio: 'pipe',
+    stdio: 'inherit',
+    encoding: 'utf8',
     shell: isWin,
 };
 
-const pipeResult = (result) => {
-    if (result.stdout?.length) {
-        process.stdout.write(result.stdout);
+const runNodeGyp = (phase) => {
+    const args = [phase, ...sharedArgs];
+    let result;
+
+    if (fs.existsSync(localBinary)) {
+        result = spawnSync(localBinary, args, spawnOptions);
+        if (result.status === 0) {
+            return result;
+        }
+        if (result.error && result.error.code !== 'ENOENT') {
+            return result;
+        }
     }
-    if (result.stderr?.length) {
-        process.stderr.write(result.stderr);
+
+    const globalCmd = isWin ? 'node-gyp.cmd' : 'node-gyp';
+    result = spawnSync(globalCmd, args, spawnOptions);
+    if (result.status === 0) {
+        return result;
     }
+    if (!result.error || result.error.code !== 'ENOENT') {
+        return result;
+    }
+
+    result = spawnSync('npx', ['node-gyp', ...args], {
+        stdio: 'inherit',
+        encoding: 'utf8',
+    });
+    return result;
 };
 
-const formatCommand = (command, args) => [command, ...args].join(' ');
-
-const handleFailure = (commandLabel, result) => {
-    let errorMessage = `[soem-node] Échec de l'exécution de ${commandLabel}.`;
+const fail = (phase, result) => {
+    let errorMessage = `[soem-node] Échec de node-gyp ${phase}.`;
     if (result.error) {
         errorMessage += ` ${result.error.message}`;
     } else if (typeof result.status === 'number') {
@@ -54,45 +86,19 @@ const handleFailure = (commandLabel, result) => {
         errorMessage += ` Signal reçu: ${result.signal}.`;
     }
 
-    const stderrOutput = result.stderr?.toString();
-    if (stderrOutput) {
-        errorMessage += `\n--- stderr ---\n${stderrOutput.trimEnd()}`;
-    }
-
     console.error(errorMessage);
     process.exit(result.status || 1);
 };
 
-const execute = (command, args) => {
-    const result = spawnSync(command, args, spawnOptions);
-    pipeResult(result);
-    return result;
-};
-
-if (isWin) {
-    const args = ['rebuild', ...sharedArgs];
-    const result = execute(localBinary, args);
-    if (result.error || result.status !== 0) {
-        handleFailure(formatCommand(localBinary, args), result);
-    }
-    process.exit(0);
+const configureResult = runNodeGyp('configure');
+if (configureResult.status !== 0) {
+    fail('configure', configureResult);
 }
 
-const npxArgs = ['cmake-js', 'rebuild', ...sharedArgs];
-let result = execute('npx', npxArgs);
-
-if (result.error?.code === 'ENOENT') {
-    console.warn("[soem-node] 'npx' est indisponible, tentative avec le binaire local cmake-js.");
-    const directArgs = ['rebuild', ...sharedArgs];
-    result = execute(localBinary, directArgs);
-    if (result.error || result.status !== 0) {
-        handleFailure(formatCommand(localBinary, directArgs), result);
-    }
-    process.exit(0);
+const buildResult = runNodeGyp('build');
+if (buildResult.status !== 0) {
+    fail('build', buildResult);
 }
 
-if (result.error || result.status !== 0) {
-    handleFailure(formatCommand('npx', npxArgs), result);
-}
-
+console.log('[soem-node] Rebuild Electron terminé.');
 process.exit(0);

@@ -14,9 +14,10 @@ const RUN_STUB = process.env.RUN_INTEGRATION_STUB === 'true';
 jest.setTimeout(20000);
 
 if (!RUN_REAL && !RUN_STUB) {
-  // skip entire file if neither mode requested
-  describe.skip('Integration tests (skipped by default)', () => {
-    it('no-op', () => {});
+  // Enregistrer des placeholders test.todo pour indiquer comment activer ces tests
+  describe('Integration tests (disabled by default)', () => {
+    test.todo('Set RUN_INTEGRATION=true pour exécuter avec l’addon natif');
+    test.todo('Set RUN_INTEGRATION_STUB=true pour exécuter avec le stub JS');
   });
 } else {
   // Optionally mock the native addon with a JS stub before importing the wrapper

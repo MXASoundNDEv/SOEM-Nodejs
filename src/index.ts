@@ -2,7 +2,7 @@
 // (compatible avec Electron, asarUnpack, et différentes dispositions de build)
 // Voir: https://www.electronjs.org/docs/latest/tutorial/native-code-and-electron
 // et https://github.com/TooTallNate/node-bindings
-// NB: le nom doit correspondre à OUTPUT_NAME de la cible CMake (soem_addon)
+// NB: le nom doit correspondre au nom du module natif généré par node-gyp (target_name dans binding.gyp: soem_addon)
 // ainsi qu'au nom du module exporté via NODE_API_MODULE.
 // Fallback vers le chemin direct si nécessaire (en dev rare)
 let native: any;

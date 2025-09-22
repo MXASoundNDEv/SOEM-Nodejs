@@ -90,23 +90,19 @@ else
     exit 1
 fi
 
-# Step 6: Build native addon (if cmake-js is available)
+# Step 6: Build native addon avec node-gyp
 print_step "Build de l'addon natif"
-if command -v cmake &> /dev/null; then
-    if npx cmake-js rebuild; then
-        print_success "Build natif OK"
-        
-        # Check if .node file was created
-        if [ -f "build/Release/soem_addon.node" ]; then
-            print_success "Fichier soem_addon.node créé"
-        else
-            print_warning "Fichier .node non trouvé"
-        fi
+if npx node-gyp configure build; then
+    print_success "Build natif OK"
+
+    # Check if .node file was created
+    if [ -f "build/Release/soem_addon.node" ]; then
+        print_success "Fichier soem_addon.node créé"
     else
-        print_warning "Échec du build natif (normal si pas de CMake/compilateur)"
+        print_warning "Fichier .node non trouvé"
     fi
 else
-    print_warning "CMake non disponible - build natif ignoré"
+    print_warning "Échec du build natif (assurez-vous que node-gyp et une toolchain sont installés)"
 fi
 
 # Step 7: Run tests

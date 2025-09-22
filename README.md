@@ -5,6 +5,7 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/MXASoundNDEv/SOEM-Nodejs)
+[![Coverage](https://img.shields.io/badge/coverage-38%25-yellow)](./coverage/index.html)
 
 Bindings Node.js haute performance pour [SOEM (Simple Open EtherCAT Master)](https://github.com/OpenEtherCATsociety/SOEM) avec détection automatique des interfaces réseau et utilitaires de gestion avancés.
 
@@ -27,8 +28,10 @@ npm install soem-node
 ### Prérequis système
 
 - **Node.js** >= 18
-- **CMake** >= 3.18
-- **Compilateur C++** (gcc/clang/MSVC)
+- **Compilateur C/C++** (MSVC Build Tools sous Windows, gcc ou clang sous Linux)
+- **Python** (détecté par node-gyp)
+
+> CMake n'est plus requis : la chaîne de build utilise uniquement `node-gyp` et `binding.gyp`.
 
 #### Windows
 - **Npcap** (recommandé) ou **WinPcap** (pour l'accès réseau)
@@ -119,33 +122,23 @@ main().catch(console.error);
 
 ## Build manuel
 
+La construction appelle `node-gyp` et génère automatiquement `ec_options.h` via l'action déclarée dans `binding.gyp` (script `scripts/generate-ec-options.js`).
+
 ```
 npm run build
 ```
 
+Le binaire natif est produit dans `build/Release/soem_addon.node`.
+
 ## Utilisation avec Electron
 
-Cette librairie utilise Node-API (N-API), ce qui garantit une compatibilité binaire stable entre Node.js et Electron tant que la version de N-API supportée est identique. Toutefois, sur certains environnements, il peut être nécessaire de reconstruire le module natif contre les en-têtes d'Electron.
-
-1) Rebuild ciblé Electron (recommandé si nécessaire)
+Basé sur **Node-API (N-API)** : la plupart des versions d'Electron compatibles avec le niveau N-API supporté fonctionnent sans rebuild. Si nécessaire (erreur de chargement/ABI) :
 
 ```bash
-# via script utilitaire (Windows PowerShell)
-npm run rebuild:electron -- 30.0.0
-
-# ou à l'installation
-npm install --runtime=electron --target=30.0.0
+npm rebuild --runtime=electron --target=30.0.0 --dist-url=https://electronjs.org/headers
 ```
 
-Le script `rebuild:electron` appelle `cmake-js rebuild --runtime=electron --runtimeVersion=<version>`. Pendant `npm install`, si vous passez `--runtime=electron --target=<version>`, le script `postinstall` détecte Electron et reconstruit automatiquement.
-
-En cas d'échec, `npm run rebuild:electron` renvoie désormais un code de sortie non nul et affiche les erreurs de `cmake-js` pour faciliter le diagnostic. Sur les systèmes POSIX où `npx` est indisponible, le script bascule automatiquement sur le binaire `cmake-js` local installé avec le projet.
-
-2) Chargement du binaire dans Electron
-
-- Le chargement utilise le paquet `bindings` pour localiser `soem_addon.node`, compatible avec les bundles Electron et `asarUnpack`.
-- Si vous empaquetez votre app avec ASAR, placez le binaire natif dans une section non-emballée. Par exemple avec `electron-builder`:
-
+Pour `electron-builder` :
 ```jsonc
 {
   "asarUnpack": [
@@ -154,21 +147,12 @@ En cas d'échec, `npm run rebuild:electron` renvoie désormais un code de sortie
 }
 ```
 
-Avec `electron-packager`, utilisez l’option équivalente pour exclure les `.node` du paquet ASAR ou les copier dans `resources/app.asar.unpacked`.
+Checklist rapide :
+- Installer Npcap (Windows) ou libpcap (Linux)
+- Vérifier l'architecture (x64 / arm64)
+- Ajuster les capabilities Linux (voir plus haut)
 
-3) Prérequis système dans Electron
-
-- Windows: Npcap/WinPcap doit être installé pour l’accès réseau bas niveau.
-- Linux: `libpcap` et les capacités réseau (voir plus haut la section permissions).
-
-4) Dépannage spécifique Electron
-
-- Erreur de chargement du module natif: lancez `npm run rebuild:electron -- <version>` et relancez l’app.
-- Architecture/ABI: assurez-vous que l’architecture (x64/arm64) de votre app Electron correspond à celle du module natif.
-- CMake/Toolchain: Electron nécessite une toolchain C/C++ opérationnelle (MSVC sous Windows, gcc/clang sous Linux).
-
-Référence: Documentation Electron – Native code & Electron
-https://www.electronjs.org/docs/latest/tutorial/native-code-and-electron
+Réf. : https://www.electronjs.org/docs/latest/tutorial/native-code-and-electron
 
 ## 🧪 Tests et Qualité
 
@@ -241,7 +225,7 @@ soem-node/
 ├── types/             # Définitions TypeScript
 ├── external/          # Sous-modules (SOEM)
 ├── docs/              # Documentation
-└── scripts/           # Scripts de build
+└── scripts/           # Scripts utilitaires (génération options, release, CI)
 ```
 
 ## Exemple
@@ -254,9 +238,11 @@ Ce script détecte les esclaves, échange les `processdata` et lit l'SDO `0x1000
 
 ## Dépannage
 
-- Vérifiez que le sous-module SOEM est initialisé.
-- Assurez-vous que votre toolchain C/C++ et CMake sont installés.
-- Utilisez `DEBUG=cmake-js:*` pour des traces détaillées.
+- Binaire introuvable : vérifier `build/Release/soem_addon.node` après `npm run build`.
+- Erreurs compilation : vérifier Python + toolchain C/C++.
+- Accès réseau refusé : Npcap/libpcap + permissions/capabilities.
+- Rebuild forcé : `npm rebuild --verbose` (ajouter flags Electron si besoin).
+- Debug approfondi : `node-gyp configure build --verbose`.
 
 ## Licence
 

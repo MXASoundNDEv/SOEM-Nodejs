@@ -98,13 +98,12 @@ catch {
     exit 1
 }
 
-# Step 6: Build native addon (if cmake-js is available)
+# Step 6: Build native addon avec node-gyp
 Write-Step "Build de l'addon natif"
 try {
-    $null = Get-Command cmake -ErrorAction Stop
-    npx cmake-js rebuild
+    npx node-gyp configure build
     Write-Success "Build natif OK"
-    
+
     # Check if .node file was created
     if (Test-Path "build\Release\soem_addon.node") {
         Write-Success "Fichier soem_addon.node créé"
@@ -114,7 +113,7 @@ try {
     }
 }
 catch {
-    Write-Warning "CMake non disponible ou échec du build natif"
+    Write-Warning "Échec du build natif (assurez-vous que node-gyp et une toolchain sont installés)"
 }
 
 # Step 7: Run tests
