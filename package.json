@@ -96,6 +96,7 @@
     "external",
     "LICENSE",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "binding.gyp"
   ]
 }

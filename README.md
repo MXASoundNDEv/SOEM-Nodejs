@@ -247,3 +247,199 @@ Ce script détecte les esclaves, échange les `processdata` et lit l'SDO `0x1000
 ## Licence
 
 Ce projet est distribué sous licence GPL-2.0-or-later. SOEM est GPLv2 avec exceptions ; la distribution de binaires précompilés peut imposer de publier votre code source. Une licence commerciale de SOEM est disponible pour des utilisations propriétaires.
+
+## 📘 API détaillée (SoemMaster)
+
+Cette section résume et intègre la documentation de `docs/API-SoemMaster.md` directement dans le README. Pour des détails supplémentaires (contexte EtherCAT, glossaire), voir le dossier `docs/`.
+
+### Table des matières
+
+1. Vue d'ensemble
+2. Import & types
+3. Cycle de vie minimal
+4. Tableau récapitulatif
+5. Référence par catégorie
+   - Initialisation & découverte
+   - Process Data (PDO / Groupes)
+   - Accès objets (SDO / SoE / EEPROM)
+   - Gestion d'état & récupération
+   - Distributed Clocks & Sync
+   - Accès bas-niveau (APRD/APWR/LRW/LRD/LWR)
+   - Utilitaires & diagnostics
+6. Exemples avancés
+7. Erreurs & diagnostics
+8. Bonnes pratiques performance
+9. FAQ courte
+
+---
+
+### 1. Vue d'ensemble
+
+`SoemMaster` est un wrapper TypeScript au-dessus du binding natif SOEM. Il fournit:
+- Découverte et configuration des esclaves
+- Mapping PDO et échanges cycliques
+- Lecture/écriture SDO, SoE, EEPROM
+- Primitives bas-niveau (APRD, etc.)
+- Gestion de Distributed Clocks (DC)
+- Fonctions de récupération et reconfiguration d'esclaves
+
+Les méthodes reflètent les primitives SOEM. Les validations avancées sont faites côté natif. Vérifiez systématiquement les retours.
+
+### 2. Import & types
+
+CommonJS:
+```js
+const { SoemMaster } = require('soem-node');
+```
+ESM / TypeScript:
+```ts
+import { SoemMaster } from 'soem-node';
+```
+
+Type principal supplémentaire:
+```ts
+interface NetworkInterface { name: string; description: string }
+```
+
+### 3. Cycle de vie minimal
+
+```
+new SoemMaster(ifname) -> init() -> configInit() -> (slaves > 0 ?) -> configMapPDO() -> [boucle]
+  sendProcessdata(); receiveProcessdata(); (SDO/SoE accès ponctuels) -> close()
+```
+
+### 4. Tableau récapitulatif
+
+| Méthode | Retour | Catégorie | Notes |
+|---------|--------|-----------|-------|
+| constructor(ifname?) | instance | Init | Interface réseau par défaut `eth0` (adapter sous Windows) |
+| init() | boolean | Init | Ouvre l'interface |
+| configInit() | number | Découverte | Nombre d'esclaves |
+| configMapPDO() | void | PDO | Map processdata |
+| state() | number | État | Lecture cache |
+| readState() | number | État | Force rafraîchissement |
+| sdoRead(slave,i,sub,ca?) | Buffer\|null | SDO | Complete Access optionnel |
+| sdoWrite(slave,i,sub,data,ca?) | boolean | SDO | Complete Access optionnel |
+| sendProcessdata() | number | PDO | Envoi cycle |
+| receiveProcessdata() | number | PDO | WKC / octets |
+| writeState(slave,state) | number | État | Workcounter/code |
+| stateCheck(slave,req,timeout?) | number | État | Bloque jusqu'état |
+| reconfigSlave(slave,timeout?) | number | Récupération | Reconfigure |
+| recoverSlave(slave,timeout?) | number | Récupération | >0 = ok |
+| slaveMbxCyclic(slave) | number | Mailbox | Active cyclique |
+| configDC() | boolean | DC | Active DC |
+| getSlaves() | any[] | Info | Métadonnées esclaves |
+| initRedundant(if1,if2) | boolean | Redondance | Master redondant |
+| configMapGroup(group?) | Buffer\|null | PDO Group | Mapping groupe |
+| sendProcessdataGroup(group?) | number | PDO Group | Variante |
+| receiveProcessdataGroup(group?,timeout?) | number | PDO Group | Variante |
+| mbxHandler(group?,limit?) | number | Mailbox | Traitement messages |
+| elist2string() | string | Diagnostic | Journal erreurs |
+| SoEread(slave,driveNo,flags,idn) | Buffer\|null | SoE | Lecture élément |
+| SoEwrite(slave,driveNo,flags,idn,data) | boolean | SoE | Écriture élément |
+| readeeprom(slave,addr,timeout?) | number | EEPROM | Lecture mot |
+| writeeeprom(slave,addr,data,timeout?) | number | EEPROM | Écriture mot |
+| APRD(ADP,ADO,length,timeout?) | Buffer\|null | Bas-niveau | Application Read |
+| APWR(ADP,ADO,data,timeout?) | number | Bas-niveau | Application Write |
+| LRW(LogAdr,length,buf,timeout?) | number | Bas-niveau | Logical Read/Write |
+| LRD(LogAdr,length,timeout?) | Buffer\|null | Bas-niveau | Logical Read |
+| LWR(LogAdr,data,timeout?) | number | Bas-niveau | Logical Write |
+| dcsync0(slave,act,CyclTime,CyclShift) | boolean | DC | Sync simple |
+| dcsync01(slave,act,CyclTime0,CyclTime1,CyclShift) | boolean | DC | Sync dual |
+| SoemMaster.listInterfaces() | NetworkInterface[] | Utilitaire | Découverte interfaces |
+
+### 5. Référence par catégorie
+
+#### Initialisation & découverte
+`init()`, `configInit()`, `configMapPDO()`, `initRedundant()`
+Ordre recommandé: init -> configInit -> (slaves>0) -> configMapPDO.
+
+#### Process Data (PDO / Groupes)
+`sendProcessdata()`, `receiveProcessdata()`, variantes `*Group()` pour segmenter plusieurs groupes de slaves et gérer des cadences différentes.
+
+#### Accès objets (SDO / SoE / EEPROM)
+SDO: `sdoRead` / `sdoWrite` (+ flag `ca` Complete Access). SoE pour drives supportant protocole SoE. EEPROM pour opérations bas-niveau (attention aux timings et verrouillages matériels).
+
+#### Gestion d'état & récupération
+`state()`, `readState()`, `writeState()`, `stateCheck()`, `reconfigSlave()`, `recoverSlave()`. Utiliser `stateCheck` après une transition (ex: PRE-OP -> SAFE-OP) pour attendre de façon synchrone.
+
+#### Distributed Clocks & Sync
+`configDC()`, `dcsync0()`, `dcsync01()`. Configure la synchronisation temporelle matérielle pour minimiser la dérive. Ajuster `CyclTime` en ns.
+
+#### Accès bas-niveau
+`APRD`, `APWR`, `LRW`, `LRD`, `LWR` donnent un contrôle fin sur le trafic EtherCAT. Réservé aux usages avancés (diagnostic spécifique, optimisation bas-niveau, tests conformance).
+
+#### Utilitaires & diagnostics
+`elist2string()` agrège les logs internes SOEM. `getSlaves()` permet d'inspecter dynamiquement le bus. `mbxHandler()` pour traitement mailbox périodique.
+
+### 6. Exemples avancés
+
+Boucle temps réel simplifiée (pseudo 1 kHz) :
+```js
+const master = new SoemMaster('eth0');
+if (!master.init()) throw new Error('init failed');
+try {
+  const slaves = master.configInit();
+  if (!slaves) return;
+  master.configMapPDO();
+  master.configDC();
+  const periodUs = 1000; // 1 kHz
+  const start = process.hrtime.bigint();
+  for (let i = 0; i < 5000; i++) {
+    master.sendProcessdata();
+    master.receiveProcessdata();
+    // Work... (lire/écrire buffers partagés)
+    const target = start + BigInt(i + 1) * BigInt(periodUs) * 1000n;
+    while (process.hrtime.bigint() < target) {}
+  }
+} finally { master.close(); }
+```
+
+Lecture groupée d'objets SDO (ex: indices consécutifs) :
+```js
+function readU32(master, slave, index, sub) {
+  const b = master.sdoRead(slave, index, sub);
+  return b ? b.readUInt32LE(0) : null;
+}
+const items = [0x1000,0x1001,0x1008];
+const results = Object.fromEntries(items.map(i => [i.toString(16), readU32(master,1,i,0)]));
+```
+
+Activation DC Sync simple :
+```js
+if (master.configDC()) {
+  master.dcsync0(1, true, 1000000, 0); // 1 ms cycle
+}
+```
+
+Redondance :
+```js
+const red = new SoemMaster('eth0');
+if (red.initRedundant('eth0','eth1')) {
+  // Procéder comme un master classique (configInit, etc.)
+}
+```
+
+### 7. Erreurs & diagnostics
+- Retour `false`/`null` indique échec non fatal (ex: SDO non lu)
+- Exceptions: problèmes init majeurs, erreurs N-API
+- `elist2string()` pour journal interne après anomalies
+- Timeouts: ajuster paramètres `timeout?` sur méthodes correspondantes
+- WKC (Working Counter) anormal: vérifier topologie, câblage, état esclave, pertes paquets
+
+### 8. Bonnes pratiques performance
+- Pré-allouer buffers pour `LRW` au lieu de recréer chaque cycle
+- Minimiser les appels SDO pendant la boucle temps réel (faire hors cycle ou avant)
+- Activer DC pour réduire la gigue de synchronisation
+- Sur Linux, isoler le CPU (isolcpus) et utiliser un scheduler temps réel si critique
+- Sur Windows, réduire les interruptions (désactiver services non nécessaires)
+
+### 9. FAQ courte
+**Q: Pourquoi `sdoRead` retourne null ?** L'esclave n'a pas répondu ou index/sub invalide.
+**Q: Besoin de root sous Linux ?** Non si capabilities `cap_net_raw,cap_net_admin` définies.
+**Q: Peut-on utiliser Electron ?** Oui, basé N-API; rebuild seulement si ABI incompatible.
+**Q: Comment diagnostiquer un WKC = 0 ?** Vérifier lien physique, interface sélectionnée, câbles et alimentation des esclaves.
+
+---
+
+Pour plus de détails ou contributions, consultez `docs/API-SoemMaster.md` et ouvrez une Issue/PR.
