@@ -1,6 +1,6 @@
 {
   "name": "soem-node",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Bindings Node-API pour SOEM (Simple Open EtherCAT Master)",
   "main": "dist/index.js",
   "types": "types/index.d.ts",
