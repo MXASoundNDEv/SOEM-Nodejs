@@ -12,10 +12,12 @@
 #else
 #include <sys/time.h>
 #include <unistd.h>
+#include <net/if.h>
 #endif
 
 #include "soem_wrap.hpp"
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace soemnode
@@ -37,6 +39,14 @@ namespace soemnode
         Napi::Env env = info.Env();
         if (opened_)
             return Napi::Boolean::New(env, true);
+#ifndef _WIN32
+        if (ifname_.size() >= IFNAMSIZ)
+        {
+            Napi::RangeError::New(env, "interface name too long (max " + std::to_string(IFNAMSIZ - 1) + " chars)")
+                .ThrowAsJavaScriptException();
+            return env.Null();
+        }
+#endif
         int ret = ecx_init(&ctx_, ifname_.c_str());
         opened_ = (ret != 0);
         return Napi::Boolean::New(env, opened_);
@@ -115,7 +125,14 @@ namespace soemnode
         Napi::Env env = info.Env();
         if (info.Length() < 2)
             return Napi::Number::New(env, 0);
-        uint16 slave = static_cast<uint16>(info[0].As<Napi::Number>().Uint32Value());
+        uint32 rawSlave = info[0].As<Napi::Number>().Uint32Value();
+        if (rawSlave >= EC_MAXSLAVE)
+        {
+            Napi::RangeError::New(env, "slave index out of range [0, " + std::to_string(EC_MAXSLAVE - 1) + "]")
+                .ThrowAsJavaScriptException();
+            return env.Null();
+        }
+        uint16 slave = static_cast<uint16>(rawSlave);
         uint16 req = static_cast<uint16>(info[1].As<Napi::Number>().Uint32Value());
         ctx_.slavelist[slave].state = req;
         int ret = ecx_writestate(&ctx_, slave);
@@ -222,6 +239,14 @@ namespace soemnode
             return Napi::Boolean::New(env, false);
         std::string if1 = info[0].As<Napi::String>().Utf8Value();
         std::string if2 = info[1].As<Napi::String>().Utf8Value();
+#ifndef _WIN32
+        if (if1.size() >= IFNAMSIZ || if2.size() >= IFNAMSIZ)
+        {
+            Napi::RangeError::New(env, "interface name too long (max " + std::to_string(IFNAMSIZ - 1) + " chars)")
+                .ThrowAsJavaScriptException();
+            return env.Null();
+        }
+#endif
         ecx_redportt redport;
         std::memset(&redport, 0, sizeof(redport));
         int ret = ecx_init_redundant(&ctx_, &redport, if1.c_str(), const_cast<char *>(if2.c_str()));
@@ -463,6 +488,18 @@ namespace soemnode
         uint32 CyclTime0 = static_cast<uint32>(info[2].As<Napi::Number>().Uint32Value());
         uint32 CyclTime1 = static_cast<uint32>(info[3].As<Napi::Number>().Uint32Value());
         int32 CyclShift = static_cast<int32>(info[4].As<Napi::Number>().Int32Value());
+        if (CyclTime0 == 0)
+        {
+            Napi::RangeError::New(env, "CyclTime0 must be non-zero").ThrowAsJavaScriptException();
+            return env.Null();
+        }
+        uint64_t trueCyclTime = ((static_cast<uint64_t>(CyclTime1) / CyclTime0) + 1) * static_cast<uint64_t>(CyclTime0);
+        if (trueCyclTime > 0xFFFFFFFFULL)
+        {
+            Napi::RangeError::New(env, "CyclTime0/CyclTime1 overflow the 32-bit cycle-time computation")
+                .ThrowAsJavaScriptException();
+            return env.Null();
+        }
         ecx_dcsync01(&ctx_, slave, act, CyclTime0, CyclTime1, CyclShift);
         return Napi::Boolean::New(env, true);
     }
